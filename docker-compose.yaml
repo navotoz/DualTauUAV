@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  tau:
+    build: .
+    ports:
+      - "8080:8080"
+    privileged: true
+    devices:
+      - '/dev:/dev'
+    volumes:
+      - type: bind
+        source: ./measurements
+        target: /app/measurements
+        bind:
+          create_host_path: true
+    restart: always

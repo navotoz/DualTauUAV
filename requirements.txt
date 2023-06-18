@@ -1,0 +1,15 @@
+# python 3.10
+
+# Common
+numpy
+matplotlib
+pillow
+tqdm
+tifffile
+
+# Tau2
+pyudev
+pyusb
+psutil
+pyftdi
+pyserial
