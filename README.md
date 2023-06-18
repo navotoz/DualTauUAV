@@ -2,8 +2,8 @@
 
 ## Installation
 
-1. Install Linux Ubuntu (tested using Ubuntu 20.04)
-2. Install Python 3.8
+1. Install Linux Ubuntu (tested using Ubuntu 22.04)
+2. Install Python 3.10
 3. Clone or Download the project.
 4. Open the terminal (`Ctrl+D`)
 5. Dependencies to install:
