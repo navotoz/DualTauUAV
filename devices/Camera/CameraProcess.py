@@ -48,6 +48,7 @@ class CameraCtrl(DeviceAbstract):
 
         # Thread-safe saving
         self._semaphore_save = th.Semaphore(value=0)
+        self._n_files_saved: mp.Value = mp.Value(c_uint)
 
     def _terminate_device_specifics(self) -> None:
         try:
@@ -184,3 +185,8 @@ class CameraCtrl(DeviceAbstract):
                      housing=np.stack(data['housing']),
                      time_ns=np.stack(data['time_ns']))
             logger.info(f'Dumped image {str(path)}')
+            self._n_files_saved.value = self._n_files_saved.value + 1
+
+    @property
+    def n_files_saved(self) -> int:
+        return self._n_files_saved.value

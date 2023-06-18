@@ -6,6 +6,9 @@ matplotlib
 pillow
 tqdm
 tifffile
+flask
+gunicorn
+pyyaml
 
 # Tau2
 pyudev
