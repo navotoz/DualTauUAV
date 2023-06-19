@@ -5,6 +5,9 @@ import usb.core
 import usb.util
 from numpy import ndarray
 
+
+_list_of_connected_camera = []
+
 CAMERA_TAU = 'tau2'
 
 T_FPA = 'fpa'
@@ -230,8 +233,15 @@ class CameraAbstract:
         pass
 
 
-def _make_device_from_vid_pid(vid: int, pid: int) -> usb.core.Device:
-    device = usb.core.find(idVendor=vid, idProduct=pid)
+def make_device_from_vid_pid(vid: int, pid: int) -> usb.core.Device:
+    device = None
+    devices = usb.core.find(idVendor=vid, idProduct=pid, find_all=True)
+    for d in devices:
+        if d.address in _list_of_connected_camera:
+            continue
+        device = d
+        _list_of_connected_camera.append(d.address)
+        break
     if not device:
         raise RuntimeError
 

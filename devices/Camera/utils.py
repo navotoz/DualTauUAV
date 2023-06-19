@@ -8,7 +8,7 @@ import numpy as np
 import usb
 from pyftdi.ftdi import Ftdi
 
-from devices.Camera import _make_device_from_vid_pid
+from devices.Camera import make_device_from_vid_pid
 from devices.Camera.Tau import tau2_config as ptc
 from devices.Camera.Tau.tau2_config import Code
 
@@ -92,7 +92,7 @@ def get_crc(data) -> List[int]:
 
 
 def connect_ftdi(vid, pid) -> Ftdi:
-    device = _make_device_from_vid_pid(vid, pid)
+    device = make_device_from_vid_pid(vid, pid)
 
     usb.util.claim_interface(device, 0)
     usb.util.claim_interface(device, 1)

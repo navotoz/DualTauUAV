@@ -6,8 +6,9 @@ import tkinter as tk
 
 from utils.misc import normalize_image
 
-HEIGHT_VIEWER = int(2.5*336)
-WIDTH_VIEWER = int(5*256)
+SCALE = 2.5
+WIDTH_VIEWER = int(SCALE*336)
+HEIGHT_VIEWER = int(SCALE*256)
 
 
 def closer():
@@ -29,47 +30,40 @@ def th_viewer():
     try:
         frame_pan = camera_pan.grab()
     except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        return
+        pass
     try:
         frame_mono = camera_mono.grab()
     except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        return
+        pass
     if frame_mono is not None:
-        size_root = (root.winfo_height(), root.winfo_width())
-        size_canvas = (lmain.winfo_height(), lmain.winfo_width())
-        if size_canvas != size_root:
-            lmain.config(width=root.winfo_width(), height=root.winfo_height())
-        image_tk = ImageTk.PhotoImage(normalize_image(frame_mono).resize(reversed(size_canvas)))
-        lmain.image_tk = image_tk
-        lmain.configure(image=image_tk)
+        image_tk = ImageTk.PhotoImage(normalize_image(frame_mono).resize((WIDTH_VIEWER, HEIGHT_VIEWER)))
+        l_mono_label.image_tk = image_tk
+        l_mono_label.configure(image=image_tk)
     if frame_pan is not None:
-        size_root = (root.winfo_height(), root.winfo_width())
-        size_canvas = (lmain.winfo_height(), lmain.winfo_width())
-        if size_canvas != size_root:
-            lmain.config(width=root.winfo_width(), height=root.winfo_height())
-        image_tk = ImageTk.PhotoImage(normalize_image(frame_pan).resize(reversed(size_canvas)))
-        lmain.image_tk = image_tk
-        lmain.configure(image=image_tk)
-    lmain.after(ms=1000//30, func=th_viewer)
+        image_tk = ImageTk.PhotoImage(normalize_image(frame_pan).resize((WIDTH_VIEWER, HEIGHT_VIEWER)))
+        l_pan_label.image_tk = image_tk
+        l_pan_label.configure(image=image_tk)
+    root.after(ms=1000//30, func=th_viewer)
 
 
 camera_pan = Tau2Grabber()
 camera_pan.ffc_mode = 'auto'
-if camera_pan.ffc:
-    print('FCC')
 camera_mono = Tau2Grabber()
 camera_mono.ffc_mode = 'auto'
-if camera_mono.ffc:
-    print('FCC')
+
+PAD_X = 10
+PAD_Y = 10
 root = tk.Tk()
 root.protocol('WM_DELETE_WINDOW', closer)
 root.title("Tau2 Livefeed")
-root.option_add("*Font", "TkDefaultFont 14")
-root.geometry(f"{HEIGHT_VIEWER}x{WIDTH_VIEWER}")
-app = tk.Frame(root, bg='white')
-app.grid()
-lmain = tk.Label(app)
-lmain.grid()
+root.geometry(f"{2 * WIDTH_VIEWER + 4 * PAD_X}x{HEIGHT_VIEWER + 2*PAD_Y}")
+
+# Create the labels to display the frames
+l_mono_label = tk.Label(root, width=WIDTH_VIEWER, height=HEIGHT_VIEWER)
+l_mono_label.grid(row=0, column=0, padx=PAD_X, pady=PAD_Y)
+l_pan_label = tk.Label(root, width=WIDTH_VIEWER, height=HEIGHT_VIEWER)
+l_pan_label.grid(row=0, column=1, padx=PAD_X, pady=PAD_Y)
+
 th_viewer()
 
 root.mainloop()

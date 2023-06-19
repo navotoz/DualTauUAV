@@ -28,7 +28,7 @@ def show_image(image: Union[Image.Image, np.ndarray], title=None, v_min=None, v_
 
 
 def normalize_image(image: np.ndarray) -> Image.Image:
-    if image.dtype == np.bool:
+    if image.dtype == bool:
         return Image.fromarray(image.astype('uint8') * 255)
     image = image.astype('float32')
     if (0 == image).all():
