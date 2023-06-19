@@ -1,3 +1,5 @@
 tifffile
 matplotlib
 pillow
+ipykernel
+pandas
