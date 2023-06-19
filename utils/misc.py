@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import threading as th
 from typing import Union
@@ -71,3 +72,18 @@ def save_single_npz_file(path_to_files: (str, Path)):
     indices = np.argsort(data['time'])
     data = {k: np.array(v)[indices] for k, v in data.items()}
     np.savez(path_to_files.with_suffix('.npz'), **data)
+
+
+def make_logger(name) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(name)s - %(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Create a stdout handler
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setLevel(logging.DEBUG)
+    stdout_handler.setFormatter(formatter)
+
+    # Add the stdout handler to the logger
+    logger.addHandler(stdout_handler)
+    return logger

@@ -1,5 +1,5 @@
 from collections import deque
-import datetime
+from datetime import datetime
 import multiprocessing as mp
 from pathlib import Path
 import threading as th
@@ -15,8 +15,8 @@ from usb.core import USBError
 from devices import DeviceAbstract
 from devices.Camera import CameraAbstract, INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
 from devices.Camera.Tau.Tau2Grabber import Tau2Grabber
-import logging
-logger = logging.getLogger(__name__)
+
+from utils.misc import make_logger
 TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 5
 TIME_TO_DUMP_NSEC = 12e10  # dump every 2 minutes
 
@@ -24,7 +24,7 @@ TIME_TO_DUMP_NSEC = 12e10  # dump every 2 minutes
 class CameraCtrl(DeviceAbstract):
     _camera: CameraAbstract = None
 
-    def __init__(self, path_to_save: Union[str, Path],
+    def __init__(self, path_to_save: Union[str, Path], name: str = '',
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self._path_to_save = Path(path_to_save)
@@ -35,6 +35,7 @@ class CameraCtrl(DeviceAbstract):
         self._event_connected.clear() if not is_dummy else self._event_connected.set()
         self._lock_measurements = th.RLock()
         self._frames = {}
+        self._fpa, self._housing = 0, 0
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -42,13 +43,16 @@ class CameraCtrl(DeviceAbstract):
 
         # Process-safe rate of camera
         self._rate_camera: mp.Value = mp.Value(c_uint)
-        _deque_rate_cam = deque(maxlen=100)
-        _deque_rate_cam.append(time_ns())
-        _deque_rate_cam.append(time_ns()+1)
+        self._deque_rate_cam = deque(maxlen=100)
+        self._deque_rate_cam.append(time_ns())
+        self._deque_rate_cam.append(time_ns()+1)
 
         # Thread-safe saving
         self._semaphore_save = th.Semaphore(value=0)
         self._n_files_saved: mp.Value = mp.Value(c_uint)
+
+        self._logger = make_logger(name=name)
+        self._logger.info('Created instance.')
 
     def _terminate_device_specifics(self) -> None:
         try:
@@ -90,15 +94,17 @@ class CameraCtrl(DeviceAbstract):
     def _th_connect(self) -> None:
         while self._flag_run:
             try:
+                self._logger.info('Connecting...')
                 self._camera = Tau2Grabber()
                 th.Thread(target=self._update_params, daemon=True).start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
-                logger.info('Finished setting parameters.')
+                self._camera._param_position = EnumParameterPosition.DONE
+                self._logger.info('Finished setting parameters.')
                 self._getter_temperature(T_FPA)
                 self._getter_temperature(T_HOUSING)
-                logger.info(f'Initial temperatures {self._fpa.value / 100:.2f}C.')
+                self._logger.info(f'Initial temperatures {self._fpa / 100:.2f}C.')
                 self._event_connected.set()
-                logger.info('Camera connected.')
+                self._logger.info('Camera connected.')
                 return
             except (RuntimeError, BrokenPipeError, USBError):
                 pass
@@ -124,6 +130,7 @@ class CameraCtrl(DeviceAbstract):
             sleep(TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS)
 
     def _th_getter_frame(self) -> None:
+        frame = None
         self._event_connected.wait()
         while self._flag_run:
             with self._lock_measurements:
@@ -132,13 +139,13 @@ class CameraCtrl(DeviceAbstract):
                     time_frame = time_ns()
                     self._deque_rate_cam.append(time_frame)
                 except Exception as e:
-                    logger.error(f'Exception in _th_getter_frame: {e}')
+                    self._logger.error(f'Exception in _th_getter_frame: {e}')
                     self.terminate()
                 if frame is not None:
                     self._frames.setdefault('time_ns', []).append(time_frame)
                     self._frames.setdefault('frame', []).append(frame)
-                    self._frames.setdefault('fpa', []).append(self._camera.fpa)
-                    self._frames.setdefault('housing', []).append(self._camera.housing)
+                    self._frames.setdefault('fpa', []).append(self._fpa)
+                    self._frames.setdefault('housing', []).append(self._housing)
 
     @property
     def is_connected(self) -> bool:
@@ -148,7 +155,11 @@ class CameraCtrl(DeviceAbstract):
         self._event_connected.wait()
         while True:
             try:
-                self._rate_camera.value = int(1e9 / np.nanmean(np.diff(self._deque_rate_cam)))
+                diff = np.diff(self._deque_rate_cam)
+                if len(diff) > 0:
+                    self._rate_camera.value = int(1e9 / np.nanmean(diff))
+                else:
+                    self._rate_camera.value = 0
                 [self._deque_rate_cam.popleft() for _ in range(self._deque_rate_cam.maxlen // 10)]
             except (IndexError, ValueError):
                 pass
@@ -180,11 +191,11 @@ class CameraCtrl(DeviceAbstract):
                 self._frames = {}
 
             np.savez(str(path),
-                     images=np.stack(data['image']),
+                     frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
                      housing=np.stack(data['housing']),
                      time_ns=np.stack(data['time_ns']))
-            logger.info(f'Dumped image {str(path)}')
+            self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1
 
     @property

@@ -23,9 +23,9 @@ params = INIT_CAMERA_PARAMETERS
 params['ffc_mode'] = 'auto'
 params['ffc_period'] = 1800
 
-camera_pan = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'pan')
+camera_pan = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'pan', name='pan')
 camera_pan.start()
-camera_mono = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'mono')
+camera_mono = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'mono', name='mono')
 camera_mono.start()
 
 
@@ -43,12 +43,16 @@ def delete():
 @app.route('/')
 def index():
     # Status of cameras
-    status_pan = EnumParameterPosition(camera_pan._param_setting_pos.value)
-    if status_pan == EnumParameterPosition.CONNECTED:
-        status_pan = 'Ready'
-    status_mono = EnumParameterPosition(camera_mono._param_setting_pos.value)
-    if status_mono == EnumParameterPosition.CONNECTED:
-        status_mono = 'Ready'
+    pan_status = EnumParameterPosition(camera_pan._param_setting_pos.value)
+    if pan_status == EnumParameterPosition.DONE:
+        pan_status = 'Ready'
+    else:
+        pan_status = pan_status.name
+    mono_status = EnumParameterPosition(camera_mono._param_setting_pos.value)
+    if mono_status == EnumParameterPosition.DONE:
+        mono_status = 'Ready'
+    else:
+        mono_status = mono_status.name
 
     # Rates
     rate_pan = camera_pan.rate_camera
@@ -59,8 +63,8 @@ def index():
     mono_files_saved = camera_mono.n_files_saved
 
     return render_template(
-        'camera_stats.html', status_pan=status_pan, status_mono=status_mono, pan_rate=rate_pan, mono_rate=rate_mono,
-        pan_files=pan_files_saved, mono_files=mono_files_saved)
+        'camera_stats.html', pan_status=pan_status, mono_status=mono_status, pan_rate=rate_pan,
+        mono_rate=rate_mono, pan_files=pan_files_saved, mono_files=mono_files_saved)
 
 
 if __name__ == '__main__':
