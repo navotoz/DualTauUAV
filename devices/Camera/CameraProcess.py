@@ -18,13 +18,12 @@ from devices.Camera.Tau.Tau2Grabber import Tau2Grabber
 
 from utils.misc import make_logger
 TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 5
-TIME_TO_DUMP_NSEC = 12e10  # dump every 2 minutes
 
 
 class CameraCtrl(DeviceAbstract):
     _camera: CameraAbstract = None
 
-    def __init__(self, path_to_save: Union[str, Path], name: str = '',
+    def __init__(self, path_to_save: Union[str, Path], name: str = '', time_to_save: int = 12e10,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self._path_to_save = Path(path_to_save)
@@ -36,6 +35,7 @@ class CameraCtrl(DeviceAbstract):
         self._lock_measurements = th.RLock()
         self._frames = {}
         self._fpa, self._housing = 0, 0
+        self._time_to_save = time_to_save
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -173,7 +173,7 @@ class CameraCtrl(DeviceAbstract):
         self._event_connected.wait()
         timer = time_ns()
         while True:
-            if time_ns() - timer >= TIME_TO_DUMP_NSEC:
+            if time_ns() - timer >= self._time_to_save:
                 self._semaphore_save.release()
                 timer = time_ns()
             sleep(2)

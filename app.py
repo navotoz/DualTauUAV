@@ -1,3 +1,4 @@
+from functools import partial
 import shutil
 from pathlib import Path
 from uuid import uuid4
@@ -5,7 +6,6 @@ from flask import Flask, render_template
 
 from devices.Camera import INIT_CAMERA_PARAMETERS, EnumParameterPosition
 from devices.Camera.CameraProcess import CameraCtrl
-N_SECONDS_TO_SAVE = 30
 
 app = Flask(__name__)
 
@@ -23,9 +23,11 @@ params = INIT_CAMERA_PARAMETERS
 params['ffc_mode'] = 'auto'
 params['ffc_period'] = 1800
 
-camera_pan = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'pan', name='pan')
+func_cam = partial(CameraCtrl, camera_parameters=params,
+                   time_to_save=12e10)  # dump to disk every 2 minutes
+camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
 camera_pan.start()
-camera_mono = CameraCtrl(camera_parameters=params, path_to_save=path_to_save / 'mono', name='mono')
+camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 camera_mono.start()
 
 
