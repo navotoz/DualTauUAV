@@ -43,9 +43,9 @@ class CameraCtrl(DeviceAbstract):
 
         # Process-safe rate of camera
         self._rate_camera: mp.Value = mp.Value(c_uint)
-        self._event_get_camera_rate = th.Event()
+        self._event_get_camera_rate = mp.Event()
         self._event_get_camera_rate.clear()
-        self._event_set_camera_rate = th.Event()
+        self._event_set_camera_rate = mp.Event()
         self._event_set_camera_rate.clear()
 
         # Thread-safe saving
@@ -157,7 +157,7 @@ class CameraCtrl(DeviceAbstract):
         while True:
             self._event_set_camera_rate.wait()
             with self._lock_measurements:
-                times = self._frames.get('time_ns', [0, 0])
+                times = self._frames.get('time_ns', [])
             try:
                 self._rate_camera.value = int(len(times) * 1e9 / (times[-1] - times[0]))
             except (IndexError, ZeroDivisionError):
