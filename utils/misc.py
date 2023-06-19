@@ -76,12 +76,12 @@ def save_single_npz_file(path_to_files: (str, Path)):
 
 def make_logger(name) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(name)s - %(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
     # Create a stdout handler
     stdout_handler = logging.StreamHandler()
-    stdout_handler.setLevel(logging.DEBUG)
+    stdout_handler.setLevel(logging.INFO)
     stdout_handler.setFormatter(formatter)
 
     # Add the stdout handler to the logger

@@ -51,7 +51,8 @@ class CameraCtrl(DeviceAbstract):
         self._semaphore_save = th.Semaphore(value=0)
         self._n_files_saved: mp.Value = mp.Value(c_uint)
 
-        self._logger = make_logger(name=name)
+        self._name = name
+        self._logger = make_logger(name=f"{name}Process")
         self._logger.info('Created instance.')
 
     def _terminate_device_specifics(self) -> None:
@@ -95,7 +96,7 @@ class CameraCtrl(DeviceAbstract):
         while self._flag_run:
             try:
                 self._logger.info('Connecting...')
-                self._camera = Tau2Grabber()
+                self._camera = Tau2Grabber(name=self._name)
                 th.Thread(target=self._update_params, daemon=True).start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
                 self._camera._param_position = EnumParameterPosition.DONE

@@ -1,6 +1,4 @@
 # python 3.10
-
-# Common
 numpy
 matplotlib
 pillow
@@ -9,10 +7,4 @@ tifffile
 flask
 gunicorn
 pyyaml
-
-# Tau2
-pyudev
-pyusb
-psutil
-pyftdi
-pyserial
+pyftdi  # Tau2

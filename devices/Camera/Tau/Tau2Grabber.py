@@ -10,9 +10,6 @@ import numpy as np
 from pathlib import Path
 import threading as th
 import struct
-import logging
-logger = logging.getLogger(__name__)
-
 
 KELVIN2CELSIUS = 273.15
 FTDI_PACKET_SIZE = 512 * 8
@@ -20,11 +17,8 @@ SYNC_MSG = b'SYNC' + struct.pack(4 * 'B', *[0, 0, 0, 0])
 
 
 class Tau2Grabber(Tau):
-    def __init__(self, vid=0x0403, pid=0x6010):
-        try:
-            super().__init__()
-        except IOError:
-            pass
+    def __init__(self, vid=0x0403, pid=0x6010, name: str = ''):
+        super().__init__(name)
         try:
             self._ftdi = connect_ftdi(vid, pid)
         except (RuntimeError, USBError):
@@ -45,7 +39,7 @@ class Tau2Grabber(Tau):
 
         self._thread_read = th.Thread(target=self._th_reader_func, name='th_tau2grabber_reader', daemon=True)
         self._thread_read.start()
-        logger.info('Ready.')
+        self._logger.debug('Ready.')
 
     def __del__(self) -> None:
         if hasattr(self, '_ftdi') and isinstance(self._ftdi, Ftdi):
@@ -63,9 +57,9 @@ class Tau2Grabber(Tau):
         buffer += data
         try:
             self._ftdi.write_data(buffer)
-            logger.debug(f"Send {data}")
+            self._logger.debug(f"Send {data}")
         except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
-            logger.debug('Write error.')
+            self._logger.debug('Write error.')
 
     def set_params_by_dict(self, yaml_or_dict: (Path, dict)):
         if isinstance(yaml_or_dict, Path):
@@ -131,7 +125,7 @@ class Tau2Grabber(Tau):
             parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
             self._event_read.clear()
             if parsed_msg is not None:
-                logger.debug(f"Received {parsed_msg}")
+                self._logger.debug(f"Received {parsed_msg}")
         return parsed_msg
 
     def grab(self, to_temperature: bool = False):

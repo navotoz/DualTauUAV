@@ -4,12 +4,11 @@ from pathlib import Path
 from time import sleep
 
 import numpy as np
-import serial
-from serial.tools.list_ports import comports
 
 from devices.Camera import CameraAbstract, WIDTH_IMAGE_TAU2, HEIGHT_IMAGE_TAU2, CAMERA_TAU, T_FPA, T_HOUSING
 from devices.Camera.Tau import tau2_config as ptc
 from devices.Camera.Tau.tau2_config import ARGUMENT_FPA, ARGUMENT_HOUSING
+from utils.misc import make_logger
 logger = logging.getLogger(__name__)
 
 
@@ -17,33 +16,11 @@ class Tau(CameraAbstract):
     conn = None
     _ffc_mode = None
 
-    def __init__(self, port=None, vid: int = 0x10C4, pid: int = 0xEA60, baud=921600):
+    def __init__(self, name: str):
         super().__init__()
+        self._logger = make_logger(name=f'{name}Tau2')
         self._width = WIDTH_IMAGE_TAU2
         self._height = HEIGHT_IMAGE_TAU2
-
-        if not port:
-            port = list(filter(lambda x: x.vid == vid and x.pid == pid, comports()))
-            port = port[0].device if port else None
-        if not port:
-            raise IOError('Tau2 with VPC is not connected via a serial connection.')
-        self.conn = serial.Serial(port=port, baudrate=baud)
-
-        if self.conn.is_open:
-            logger.info("Connected to camera at {}.".format(port))
-
-            self.conn.flushInput()
-            self.conn.flushOutput()
-            self.conn.timeout = 1
-
-            self.conn.read(self.conn.in_waiting)
-        else:
-            logger.critical("Couldn't connect to camera!")
-            raise RuntimeError
-
-    def __del__(self):
-        if self.conn:
-            self.conn.close()
 
     def send_command(self, command: ptc.Code, argument: (bytes, None)) -> (None, bytes):
         raise NotImplementedError
@@ -69,7 +46,7 @@ class Tau(CameraAbstract):
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0
             if not 8.0 <= res <= 99.0:  # camera temperature cannot be > 99C or < 8C, returns None.
-                logger.debug(f'Error when recv {temperature_type} - got {res}C')
+                self._logger.debug(f'Error when recv {temperature_type} - got {res}C')
                 return None
         return res
 
@@ -90,9 +67,9 @@ class Tau(CameraAbstract):
 
     def _log_set_values(self, value: int, result: bool, value_name: str) -> None:
         if result:
-            logger.info(f'Set {value_name} to {value}.')
+            self._logger.info(f'Set {value_name} to {value}.')
         else:
-            logger.warning(f'Setting {value_name} to {value} failed.')
+            self._logger.warning(f'Setting {value_name} to {value} failed.')
 
     def _mode_setter(self, mode: str, current_value: int, setter_code: ptc.Code, code_dict: dict, name: str) -> bool:
         if isinstance(mode, str):
@@ -135,10 +112,10 @@ class Tau(CameraAbstract):
                 f_log += f' FPA {t_fpa:.2f}C'
             if t_housing:
                 f_log += f', Housing {t_housing:.2f}'
-            logger.info(f_log)
+            self._logger.info(f_log)
             return True
         else:
-            logger.info('FFC Failed')
+            self._logger.info('FFC Failed')
             return False
 
     @property
@@ -208,13 +185,13 @@ class Tau(CameraAbstract):
     @sso.setter
     def sso(self, percentage: (int, tuple)):
         if percentage == self.sso:
-            logger.info(f'Set SSO to {percentage}')
+            self._logger.info(f'Set SSO to {percentage}')
             return
         self.send_command(command=ptc.SET_AGC_THRESHOLD, argument=struct.pack('>hh', 0x0400, percentage))
         if self.sso == percentage:
-            logger.info(f'Set SSO to {percentage}%')
+            self._logger.info(f'Set SSO to {percentage}%')
             return
-        logger.warning(f'Setting SSO to {percentage}% failed.')
+        self._logger.warning(f'Setting SSO to {percentage}% failed.')
 
     @property
     def contrast(self) -> int:
@@ -269,7 +246,7 @@ class Tau(CameraAbstract):
     @tlinear.setter
     def tlinear(self, value: int):
         if value == self.tlinear:
-            logger.info(f'Set TLinear to {value}.')
+            self._logger.info(f'Set TLinear to {value}.')
             return
         self.send_command(command=ptc.SET_TLINEAR_MODE, argument=struct.pack('>hh', 0x0040, value))
         if value == self.tlinear:
@@ -347,7 +324,7 @@ class Tau(CameraAbstract):
         for _ in range(5):
             self.send_command(command=ptc.SET_AGC_ACE_CORRECT, argument=struct.pack('>h', value))
             if value == self.ace:
-                logger.info(f'Set ACE to {value}.')
+                self._logger.info(f'Set ACE to {value}.')
                 return
 
     @property
@@ -366,5 +343,5 @@ class Tau(CameraAbstract):
             except (TypeError, struct.error, IndexError, RuntimeError, AttributeError):
                 continue
             if value == res:
-                logger.info(f'Set Lens number to {value + 1}.')
+                self._logger.info(f'Set Lens number to {value + 1}.')
                 return
