@@ -10,7 +10,7 @@ from datetime import datetime
 import serial
 import serial.tools.list_ports
 
-from utils.misc import SyncFlag
+from utils.tools import SyncFlag
 logger = logging.getLogger(__name__)
 
 

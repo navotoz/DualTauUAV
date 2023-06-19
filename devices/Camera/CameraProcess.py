@@ -16,7 +16,7 @@ from devices import DeviceAbstract
 from devices.Camera import CameraAbstract, INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
 from devices.Camera.Tau.Tau2Grabber import Tau2Grabber
 
-from utils.misc import make_logger
+from utils.tools import make_logger
 TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 5
 
 
@@ -93,9 +93,9 @@ class CameraCtrl(DeviceAbstract):
         self._param_setting_pos.value = self._camera._param_position.value
 
     def _th_connect(self) -> None:
+        self._logger.info('Connecting...')
         while self._flag_run:
             try:
-                self._logger.info('Connecting...')
                 self._camera = Tau2Grabber(name=self._name)
                 th.Thread(target=self._update_params, daemon=True).start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None

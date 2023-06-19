@@ -1,6 +1,4 @@
-import logging
 from pathlib import Path
-import threading as th
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -42,21 +40,6 @@ def normalize_image(image: np.ndarray) -> Image.Image:
     return Image.fromarray(image.astype('uint8'))
 
 
-class SyncFlag:
-    def __init__(self, init_state: bool = True) -> None:
-        self._event = th.Event()
-        self._event.set() if init_state else self._event.clear()
-
-    def __call__(self) -> bool:
-        return self._event.is_set()
-
-    def set(self, new_state: bool):
-        self._event.set() if new_state is True else self._event.clear()
-
-    def __bool__(self) -> bool:
-        return self._event.is_set()
-
-
 def save_single_npz_file(path_to_files: (str, Path)):
     """
     Save a single npz file to a single npz file.
@@ -72,18 +55,3 @@ def save_single_npz_file(path_to_files: (str, Path)):
     indices = np.argsort(data['time'])
     data = {k: np.array(v)[indices] for k, v in data.items()}
     np.savez(path_to_files.with_suffix('.npz'), **data)
-
-
-def make_logger(name) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(name)s - %(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-    # Create a stdout handler
-    stdout_handler = logging.StreamHandler()
-    stdout_handler.setLevel(logging.INFO)
-    stdout_handler.setFormatter(formatter)
-
-    # Add the stdout handler to the logger
-    logger.addHandler(stdout_handler)
-    return logger

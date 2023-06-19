@@ -1,13 +1,6 @@
 import multiprocessing as mp
-from dataclasses import dataclass
 from threading import Thread
-
-from PIL import Image
-
-from devices.gps import GpsData
-from utils.misc import SyncFlag, show_image
-import numpy as np
-
+from utils.tools import SyncFlag
 
 
 class DeviceAbstract(mp.Process):

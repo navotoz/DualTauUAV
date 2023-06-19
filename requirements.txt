@@ -1,9 +1,6 @@
 # python 3.10
 numpy
-matplotlib
-pillow
 tqdm
-tifffile
 flask
 gunicorn
 pyyaml

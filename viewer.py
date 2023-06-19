@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import tifffile as tifffile
 from scipy.interpolate import interp1d
 import tkinter as tk
-from functools import reduce
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import List
