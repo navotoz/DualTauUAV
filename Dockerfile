@@ -18,6 +18,7 @@ RUN apt-get install -y --no-install-recommends \
         ffmpeg \
         libsm6 \
         libxext6 \
+        libtiff-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv venv
