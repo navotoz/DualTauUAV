@@ -43,9 +43,10 @@ class CameraCtrl(DeviceAbstract):
 
         # Process-safe rate of camera
         self._rate_camera: mp.Value = mp.Value(c_uint)
-        self._deque_rate_cam = deque(maxlen=100)
-        self._deque_rate_cam.append(time_ns())
-        self._deque_rate_cam.append(time_ns()+1)
+        self._event_get_camera_rate = th.Event()
+        self._event_get_camera_rate.clear()
+        self._event_set_camera_rate = th.Event()
+        self._event_set_camera_rate.clear()
 
         # Thread-safe saving
         self._semaphore_save = th.Semaphore(value=0)
@@ -112,15 +113,15 @@ class CameraCtrl(DeviceAbstract):
             sleep(1)
 
     def _getter_temperature(self, t_type: str):  # this function exists for the th_connect function, otherwise redundant
-        with self._lock_measurements:
             t = self._camera.get_inner_temperature(t_type) if self._camera is not None else None
             if t is not None and t != 0.0 and t != -float('inf'):
                 try:
                     t = round(t * 100)
-                    if t_type == T_FPA:
-                        self._fpa = round(t, -1)  # precision for the fpa is 0.1C
-                    elif t_type == T_HOUSING:
-                        self._housing = t  # precision of the housing is 0.01C
+                    with self._lock_measurements:
+                        if t_type == T_FPA:
+                            self._fpa = round(t, -1)  # precision for the fpa is 0.1C
+                        elif t_type == T_HOUSING:
+                            self._housing = t  # precision of the housing is 0.01C
                 except (BrokenPipeError, RuntimeError):
                     pass
 
@@ -138,7 +139,6 @@ class CameraCtrl(DeviceAbstract):
                 try:
                     frame = self._camera.grab() if self._camera is not None else None
                     time_frame = time_ns()
-                    self._deque_rate_cam.append(time_frame)
                 except Exception as e:
                     self._logger.error(f'Exception in _th_getter_frame: {e}')
                     self.terminate()
@@ -155,19 +155,21 @@ class CameraCtrl(DeviceAbstract):
     def _th_rate_camera_function(self) -> None:
         self._event_connected.wait()
         while True:
+            self._event_set_camera_rate.wait()
+            with self._lock_measurements:
+                times = self._frames.get('time_ns', [0, 0])
             try:
-                diff = np.diff(self._deque_rate_cam)
-                if len(diff) > 0:
-                    self._rate_camera.value = int(1e9 / np.nanmean(diff))
-                else:
-                    self._rate_camera.value = 0
-                [self._deque_rate_cam.popleft() for _ in range(self._deque_rate_cam.maxlen // 10)]
-            except (IndexError, ValueError):
-                pass
-            sleep(3)
+                self._rate_camera.value = int(len(times) * 1e9 / (times[-1] - times[0]))
+            except (IndexError, ZeroDivisionError):
+                self._rate_camera.value = 0
+            self._event_get_camera_rate.set()
+            self._event_set_camera_rate.clear()
 
     @property
     def rate_camera(self) -> int:
+        self._event_get_camera_rate.clear()
+        self._event_set_camera_rate.set()
+        self._event_get_camera_rate.wait()
         return self._rate_camera.value
 
     def _th_timer(self) -> None:
