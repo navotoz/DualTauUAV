@@ -1,4 +1,3 @@
-from collections import deque
 from datetime import datetime
 import multiprocessing as mp
 from pathlib import Path
@@ -113,17 +112,17 @@ class CameraCtrl(DeviceAbstract):
             sleep(1)
 
     def _getter_temperature(self, t_type: str):  # this function exists for the th_connect function, otherwise redundant
-            t = self._camera.get_inner_temperature(t_type) if self._camera is not None else None
-            if t is not None and t != 0.0 and t != -float('inf'):
-                try:
-                    t = round(t * 100)
-                    with self._lock_measurements:
-                        if t_type == T_FPA:
-                            self._fpa = round(t, -1)  # precision for the fpa is 0.1C
-                        elif t_type == T_HOUSING:
-                            self._housing = t  # precision of the housing is 0.01C
-                except (BrokenPipeError, RuntimeError):
-                    pass
+        t = self._camera.get_inner_temperature(t_type) if self._camera is not None else None
+        if t is not None and t != 0.0 and t != -float('inf'):
+            try:
+                t = round(t * 100)
+                with self._lock_measurements:
+                    if t_type == T_FPA:
+                        self._fpa = round(t, -1)  # precision for the fpa is 0.1C
+                    elif t_type == T_HOUSING:
+                        self._housing = t  # precision of the housing is 0.01C
+            except (BrokenPipeError, RuntimeError):
+                pass
 
     def _th_getter_temperature(self) -> None:
         self._event_connected.wait()
