@@ -6,19 +6,18 @@ RUN apt-get install -y --no-install-recommends \
     gcc \
     build-essential \
     make \
-    python3-dev
-RUN apt-get install -y --no-install-recommends \
-        libc-dev \
-        libffi-dev \
-        libnotify4 \
-        libgtk2.0-dev \
-        libgtkmm-3.0-1v5 \
-        libatlas-base-dev \
-        git \
-        ffmpeg \
-        libsm6 \
-        libxext6 \
-        libtiff-dev \
+    python3-dev \
+    libc-dev \
+    libffi-dev \
+    libnotify4 \
+    libgtk2.0-dev \
+    libgtkmm-3.0-1v5 \
+    libatlas-base-dev \
+    git \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libtiff-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv venv
