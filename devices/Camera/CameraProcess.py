@@ -38,7 +38,7 @@ class CameraCtrl(DeviceAbstract):
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
-        self._param_setting_pos.value = EnumParameterPosition.DISCONNECTED
+        self._param_setting_pos.value = EnumParameterPosition.DISCONNECTED.value
 
         # Process-safe rate of camera
         self._rate_camera: mp.Value = mp.Value(c_uint)

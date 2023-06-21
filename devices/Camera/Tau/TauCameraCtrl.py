@@ -2,6 +2,7 @@ import logging
 import struct
 from pathlib import Path
 from time import sleep
+from typing import Union, Optional
 
 import numpy as np
 
@@ -22,11 +23,8 @@ class Tau(CameraAbstract):
         self._width = WIDTH_IMAGE_TAU2
         self._height = HEIGHT_IMAGE_TAU2
 
-    def send_command(self, command: ptc.Code, argument: (bytes, None)) -> (None, bytes):
+    def send_command(self, command: ptc.Code, argument: Optional[bytes]) -> Optional[bytes]:
         raise NotImplementedError
-
-    def _reset(self):
-        self.send_command(command=ptc.CAMERA_RESET, argument=None)
 
     @property
     def type(self) -> int:
@@ -41,7 +39,7 @@ class Tau(CameraAbstract):
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
         argument = struct.pack(">h", arg_hex)
-        res = self.send_command(command=command, argument=argument)
+        res = self.send_command(command=command, argument=argument, timeout=0.5)
         if res:
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0
@@ -51,7 +49,7 @@ class Tau(CameraAbstract):
         return res
 
     def _get_values_without_arguments(self, command: ptc.Code) -> int:
-        res = self.send_command(command=command, argument=None)
+        res = self.send_command(command=command, argument=None, timeout=10)
         if res is None:
             return 0xffff
         fmt = 'h' if len(res) == 2 else 'hh'
@@ -60,7 +58,7 @@ class Tau(CameraAbstract):
     def _set_values_with_2bytes_send_recv(self, value: int, current_value: int, command: ptc.Code) -> bool:
         if value == current_value:
             return True
-        res = self.send_command(command=command, argument=struct.pack('>h', value))
+        res = self.send_command(command=command, argument=struct.pack('>h', value), timeout=10)
         if res and struct.unpack('>h', res)[0] == value:
             return True
         return False
@@ -82,7 +80,7 @@ class Tau(CameraAbstract):
         self._log_set_values(mode, res, f'{name} mode')
         return res
 
-    def set_params_by_dict(self, yaml_or_dict: (Path, dict)):
+    def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
         pass
 
     @property
@@ -98,7 +96,7 @@ class Tau(CameraAbstract):
             while 'man' not in self.ffc_mode:
                 self.ffc_mode = ptc.FFC_MODE_CODE_DICT['manual']
             sleep(0.2)
-        res = self.send_command(command=ptc.DO_FFC, argument=length)
+        res = self.send_command(command=ptc.DO_FFC, argument=length, timeout=10)
         sleep(0.2)
         if 'ext' in prev_mode:
             while 'ext' not in self.ffc_mode:
@@ -179,15 +177,15 @@ class Tau(CameraAbstract):
 
     @property
     def sso(self) -> int:
-        res = self.send_command(command=ptc.GET_AGC_THRESHOLD, argument=struct.pack('>h', 0x0400))
+        res = self.send_command(command=ptc.GET_AGC_THRESHOLD, argument=struct.pack('>h', 0x0400), timeout=10)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     @sso.setter
-    def sso(self, percentage: (int, tuple)):
+    def sso(self, percentage: Union[int, tuple]):
         if percentage == self.sso:
             self._logger.info(f'Set SSO to {percentage}')
             return
-        self.send_command(command=ptc.SET_AGC_THRESHOLD, argument=struct.pack('>hh', 0x0400, percentage))
+        self.send_command(command=ptc.SET_AGC_THRESHOLD, argument=struct.pack('>hh', 0x0400, percentage), timeout=10)
         if self.sso == percentage:
             self._logger.info(f'Set SSO to {percentage}%')
             return
@@ -240,7 +238,7 @@ class Tau(CameraAbstract):
 
     @property
     def tlinear(self):
-        res = self.send_command(command=ptc.GET_TLINEAR_MODE, argument=struct.pack('>h', 0x0040))
+        res = self.send_command(command=ptc.GET_TLINEAR_MODE, argument=struct.pack('>h', 0x0040), timeout=10)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     @tlinear.setter
@@ -248,20 +246,20 @@ class Tau(CameraAbstract):
         if value == self.tlinear:
             self._logger.info(f'Set TLinear to {value}.')
             return
-        self.send_command(command=ptc.SET_TLINEAR_MODE, argument=struct.pack('>hh', 0x0040, value))
+        self.send_command(command=ptc.SET_TLINEAR_MODE, argument=struct.pack('>hh', 0x0040, value), timeout=10)
         if value == self.tlinear:
             self._log_set_values(value, True, 'tlinear mode')
             return
         self._log_set_values(value, False, 'tlinear mode')
 
     def _digital_output_getter(self, command: ptc.Code, argument: bytes):
-        res = self.send_command(command=command, argument=argument)
+        res = self.send_command(command=command, argument=argument, timeout=10)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     def _digital_output_setter(self, mode: int, current_mode: int, command: ptc.Code, argument: int) -> bool:
         if mode == current_mode:
             return True
-        res = self.send_command(command=command, argument=struct.pack('>bb', argument, mode))
+        res = self.send_command(command=command, argument=struct.pack('>bb', argument, mode), timeout=10)
         if res and struct.unpack('>bb', res)[-1] == mode:
             return True
         return False
@@ -311,7 +309,7 @@ class Tau(CameraAbstract):
         self._mode_setter(mode, self.fps, ptc.SET_FPS, ptc.FPS_CODE_DICT, 'FPS')
 
     def reset(self):
-        return self.send_command(command=ptc.CAMERA_RESET, argument=None)
+        return self.send_command(command=ptc.CAMERA_RESET, argument=None, timeout=10)
 
     @property
     def ace(self):
@@ -322,7 +320,7 @@ class Tau(CameraAbstract):
         if not -8 <= value <= 8:
             return
         for _ in range(5):
-            self.send_command(command=ptc.SET_AGC_ACE_CORRECT, argument=struct.pack('>h', value))
+            self.send_command(command=ptc.SET_AGC_ACE_CORRECT, argument=struct.pack('>h', value), timeout=10)
             if value == self.ace:
                 self._logger.info(f'Set ACE to {value}.')
                 return
@@ -337,7 +335,7 @@ class Tau(CameraAbstract):
             return
         value -= 1  # the terms of lenses is 0x0001 or 0x0000
         for _ in range(5):
-            res = self.send_command(command=ptc.SET_LENS_NUMBER, argument=struct.pack('>h', value))
+            res = self.send_command(command=ptc.SET_LENS_NUMBER, argument=struct.pack('>h', value), timeout=10)
             try:
                 res = struct.unpack('>h', res)[0]
             except (TypeError, struct.error, IndexError, RuntimeError, AttributeError):

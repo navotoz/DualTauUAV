@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from devices.Camera.utils import connect_ftdi, is_8bit_image_borders_valid, BytesBuffer, \
     REPLY_HEADER_BYTES, parse_incoming_message, make_packet, generate_subsets_indices_in_string
 from devices.Camera.Tau.TauCameraCtrl import Tau
@@ -61,7 +62,7 @@ class Tau2Grabber(Tau):
         except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
             self._logger.debug('Write error.')
 
-    def set_params_by_dict(self, yaml_or_dict: (Path, dict)):
+    def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
         if isinstance(yaml_or_dict, Path):
             params = yaml.safe_load(yaml_or_dict)
         else:
@@ -113,7 +114,8 @@ class Tau2Grabber(Tau):
                 self._event_reply_ready.set()
                 self._event_read.clear()
 
-    def send_command(self, command: ptc.Code, argument: (bytes, None)) -> (None, bytes):
+    def send_command(self, command: ptc.Code, argument: Optional[bytes] = None, 
+                     timeout: float = 10.) -> Optional[bytes]:
         data = make_packet(command, argument)
         with self._lock_parse_command:
             self._buffer.clear_buffer()  # ready for the reply
@@ -121,7 +123,7 @@ class Tau2Grabber(Tau):
             self._event_read.set()
             self._write(data)
             self._event_reply_ready.clear()  # counts the number of bytes in the buffer
-            self._event_reply_ready.wait(timeout=0.2)  # blocking until the number of bytes for the reply are reached
+            self._event_reply_ready.wait(timeout=timeout)  # blocking until the number of bytes for the reply are reached
             parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
             self._event_read.clear()
             if parsed_msg is not None:
