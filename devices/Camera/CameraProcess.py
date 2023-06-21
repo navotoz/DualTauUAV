@@ -152,8 +152,7 @@ class CameraCtrl(DeviceAbstract):
         return self._event_connected.is_set()
 
     def _th_rate_camera_function(self) -> None:
-        self._event_connected.wait()
-        while True:
+        while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
             self._event_set_camera_rate.wait()
             with self._lock_measurements:
                 times = self._frames.get('time_ns', [])

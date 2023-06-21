@@ -23,7 +23,7 @@ params = INIT_CAMERA_PARAMETERS
 params['ffc_mode'] = 'auto'
 params['ffc_period'] = 1800
 
-func_cam = partial(CameraCtrl, camera_parameters=params,
+func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
                    time_to_save=12e10)  # dump to disk every 2 minutes
 camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
 camera_pan.start()
