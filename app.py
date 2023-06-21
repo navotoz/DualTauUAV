@@ -21,6 +21,7 @@ if NAME_DEVICES_THREAD not in map(lambda x: x.name, th.enumerate()):
     thread_devices = ThreadDevices(path_to_save=path_to_save)
     thread_devices.start()
 
+
 @app.route('/delete_all')
 def delete():
     for idx, folder in enumerate(path_to_save.parent.glob("*/")):
@@ -35,11 +36,11 @@ def delete():
 @app.route('/')
 def index():
     return render_template(
-        'camera_stats.html', 
-        pan_status=thread_devices.status_pan, 
+        'camera_stats.html',
+        pan_status=thread_devices.status_pan,
         pan_rate=thread_devices.rate_pan,
-        pan_files=thread_devices.n_files_pan, 
-        mono_status=thread_devices.status_mono, 
+        pan_files=thread_devices.n_files_pan,
+        mono_status=thread_devices.status_mono,
         mono_rate=thread_devices.rate_mono,
         mono_files=thread_devices.n_files_mono)
 

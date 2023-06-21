@@ -1,8 +1,8 @@
 import pyftdi.ftdi
 from PIL import ImageTk
 
-from devices.Camera.Tau.Tau2Grabber import Tau2Grabber
 import tkinter as tk
+from devices.Camera.Tau2Grabber import Tau2
 
 from utils.misc import normalize_image
 
@@ -46,9 +46,9 @@ def th_viewer():
     root.after(ms=1000//30, func=th_viewer)
 
 
-camera_pan = Tau2Grabber()
+camera_pan = Tau2()
 camera_pan.ffc_mode = 'auto'
-camera_mono = Tau2Grabber()
+camera_mono = Tau2()
 camera_mono.ffc_mode = 'auto'
 
 PAD_X = 10
