@@ -1,11 +1,10 @@
-from functools import partial
-import shutil
 from pathlib import Path
+import shutil
 from uuid import uuid4
 from flask import Flask, render_template
+import threading as th
 
-from devices.Camera import INIT_CAMERA_PARAMETERS, EnumParameterPosition
-from devices.Camera.CameraProcess import CameraCtrl
+from thread_devices import ThreadDevices, NAME_DEVICES_THREAD
 
 app = Flask(__name__)
 
@@ -18,18 +17,9 @@ while True:
     else:
         path_to_save = Path().cwd() / 'measurements' / str(uuid4().hex)
 
-# Init two cameras - Panchromatic and Monochromatic
-params = INIT_CAMERA_PARAMETERS
-params['ffc_mode'] = 'auto'
-params['ffc_period'] = 1800
-
-func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
-                   time_to_save=12e10)  # dump to disk every 2 minutes
-camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
-camera_pan.start()
-camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
-camera_mono.start()
-
+if NAME_DEVICES_THREAD not in map(lambda x: x.name, th.enumerate()):
+    thread_devices = ThreadDevices(path_to_save=path_to_save)
+    thread_devices.start()
 
 @app.route('/delete_all')
 def delete():
@@ -44,29 +34,14 @@ def delete():
 
 @app.route('/')
 def index():
-    # Status of cameras
-    pan_status = EnumParameterPosition(camera_pan._param_setting_pos.value)
-    if pan_status == EnumParameterPosition.DONE:
-        pan_status = 'Ready'
-    else:
-        pan_status = pan_status.name
-    mono_status = EnumParameterPosition(camera_mono._param_setting_pos.value)
-    if mono_status == EnumParameterPosition.DONE:
-        mono_status = 'Ready'
-    else:
-        mono_status = mono_status.name
-
-    # Rates
-    rate_pan = camera_pan.rate_camera
-    rate_mono = camera_mono.rate_camera
-
-    # Number of files saved
-    pan_files_saved = camera_pan.n_files_saved
-    mono_files_saved = camera_mono.n_files_saved
-
     return render_template(
-        'camera_stats.html', pan_status=pan_status, mono_status=mono_status, pan_rate=rate_pan,
-        mono_rate=rate_mono, pan_files=pan_files_saved, mono_files=mono_files_saved)
+        'camera_stats.html', 
+        pan_status=thread_devices.status_pan, 
+        pan_rate=thread_devices.rate_pan,
+        pan_files=thread_devices.n_files_pan, 
+        mono_status=thread_devices.status_mono, 
+        mono_rate=thread_devices.rate_mono,
+        mono_files=thread_devices.n_files_mono)
 
 
 if __name__ == '__main__':

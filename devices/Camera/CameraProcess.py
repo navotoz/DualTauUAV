@@ -42,10 +42,8 @@ class CameraCtrl(DeviceAbstract):
 
         # Process-safe rate of camera
         self._rate_camera: mp.Value = mp.Value(c_uint)
-        self._event_get_camera_rate = mp.Event()
-        self._event_get_camera_rate.clear()
-        self._event_set_camera_rate = mp.Event()
-        self._event_set_camera_rate.clear()
+        self._semaphore_get_rate = mp.Semaphore(value=0)
+        self._semaphore_set_rate = mp.Semaphore(value=0)
 
         # Thread-safe saving
         self._semaphore_save = th.Semaphore(value=0)
@@ -153,21 +151,19 @@ class CameraCtrl(DeviceAbstract):
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
-            self._event_set_camera_rate.wait()
+            self._semaphore_set_rate.acquire()
             with self._lock_measurements:
                 times = self._frames.get('time_ns', [])
             try:
                 self._rate_camera.value = int(len(times) * 1e9 / (times[-1] - times[0]))
             except (IndexError, ZeroDivisionError):
                 self._rate_camera.value = 0
-            self._event_get_camera_rate.set()
-            self._event_set_camera_rate.clear()
+            self._semaphore_get_rate.release()
 
     @property
     def rate_camera(self) -> int:
-        self._event_get_camera_rate.clear()
-        self._event_set_camera_rate.set()
-        self._event_get_camera_rate.wait()
+        self._semaphore_set_rate.release()
+        self._semaphore_get_rate.acquire()
         return self._rate_camera.value
 
     def _th_timer(self) -> None:

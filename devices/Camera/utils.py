@@ -2,7 +2,7 @@ import binascii
 import re
 import struct
 import threading as th
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 import usb
@@ -91,8 +91,8 @@ def get_crc(data) -> List[int]:
     return list(map(lambda x: int.from_bytes(x, 'big'), crc))
 
 
-def connect_ftdi(vid, pid) -> Ftdi:
-    device = make_device_from_vid_pid(vid, pid)
+def connect_ftdi(vid, pid) -> Tuple[Ftdi, str]:
+    device, address = make_device_from_vid_pid(vid, pid)
 
     usb.util.claim_interface(device, 0)
     usb.util.claim_interface(device, 1)
@@ -102,7 +102,7 @@ def connect_ftdi(vid, pid) -> Ftdi:
 
     ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
     ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
-    return ftdi
+    return ftdi, address
 
 
 def is_8bit_image_borders_valid(raw_image_8bit: np.ndarray, height: int) -> bool:

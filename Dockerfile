@@ -36,4 +36,5 @@ WORKDIR /app
 EXPOSE 8080
 
 # Set the entrypoint to start the Flask app
+# Set a single worker thread (-w 1) to avoid instansiating the cameras twice
 ENTRYPOINT ["/venv/bin/gunicorn", "-w", "1", "--timeout", "1000", "--bind", "0.0.0.0:8080", "app:app"]

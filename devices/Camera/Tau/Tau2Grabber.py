@@ -20,7 +20,7 @@ class Tau2Grabber(Tau):
     def __init__(self, vid=0x0403, pid=0x6010, name: str = ''):
         super().__init__(name)
         try:
-            self._ftdi = connect_ftdi(vid, pid)
+            self._ftdi, address = connect_ftdi(vid, pid)
         except (RuntimeError, USBError):
             raise RuntimeError('Could not connect to the Tau2 camera.')
         self._lock_parse_command = th.Lock()
@@ -39,7 +39,7 @@ class Tau2Grabber(Tau):
 
         self._thread_read = th.Thread(target=self._th_reader_func, name='th_tau2grabber_reader', daemon=True)
         self._thread_read.start()
-        self._logger.debug('Ready.')
+        self._logger.info(f'Found device in {address}.')
 
     def __del__(self) -> None:
         if hasattr(self, '_ftdi') and isinstance(self._ftdi, Ftdi):
@@ -121,7 +121,7 @@ class Tau2Grabber(Tau):
             self._event_read.set()
             self._write(data)
             self._event_reply_ready.clear()  # counts the number of bytes in the buffer
-            self._event_reply_ready.wait(timeout=10)  # blocking until the number of bytes for the reply are reached
+            self._event_reply_ready.wait(timeout=0.2)  # blocking until the number of bytes for the reply are reached
             parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
             self._event_read.clear()
             if parsed_msg is not None:

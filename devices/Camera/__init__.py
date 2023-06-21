@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from pathlib import Path
 from enum import IntEnum, unique
+from typing import Tuple
 import usb.core
 import usb.util
 from numpy import ndarray
@@ -233,7 +234,7 @@ class CameraAbstract:
         pass
 
 
-def make_device_from_vid_pid(vid: int, pid: int) -> usb.core.Device:
+def make_device_from_vid_pid(vid: int, pid: int) -> Tuple[usb.core.Device, str]:
     device = None
     devices = usb.core.find(idVendor=vid, idProduct=pid, find_all=True)
     for d in devices:
@@ -257,4 +258,4 @@ def make_device_from_vid_pid(vid: int, pid: int) -> usb.core.Device:
                 except usb.core.USBError as e:
                     print(f"Could not detach kernel driver from interface({intf.bInterfaceNumber}): {e}")
     device.set_configuration(1)
-    return device
+    return device, d.address
