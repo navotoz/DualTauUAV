@@ -39,7 +39,7 @@ class Tau(CameraAbstract):
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
         argument = struct.pack(">h", arg_hex)
-        res = self.send_command(command=command, argument=argument, timeout=0.5)
+        res = self.send_command(command=command, argument=argument, timeout=10.0)
         if res:
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0

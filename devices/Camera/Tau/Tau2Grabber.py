@@ -13,7 +13,6 @@ import threading as th
 import struct
 
 KELVIN2CELSIUS = 273.15
-FTDI_PACKET_SIZE = 512 * 8
 SYNC_MSG = b'SYNC' + struct.pack(4 * 'B', *[0, 0, 0, 0])
 
 
@@ -24,11 +23,11 @@ class Tau2Grabber(Tau):
             self._ftdi, address = connect_ftdi(vid, pid)
         except (RuntimeError, USBError):
             raise RuntimeError('Could not connect to the Tau2 camera.')
+        self._ftdi_read_chunksize = self._ftdi.read_data_get_chunksize()
         self._lock_parse_command = th.Lock()
         self._event_read = th.Event()
         self._event_read.clear()
-        self._event_reply_ready = th.Event()
-        self._event_reply_ready.clear()
+        self._semaphore_reply_ready = th.Semaphore(value=0)
         self._event_frame_header_in_buffer = th.Event()
         self._event_frame_header_in_buffer.clear()
         self._param_position = EnumParameterPosition.DISCONNECTED
@@ -45,8 +44,8 @@ class Tau2Grabber(Tau):
     def __del__(self) -> None:
         if hasattr(self, '_ftdi') and isinstance(self._ftdi, Ftdi):
             self._ftdi.close()
-        if hasattr(self, '_event_reply_ready') and isinstance(self._event_reply_ready, th.Event):
-            self._event_reply_ready.set()
+        if hasattr(self, '_event_reply_ready') and isinstance(self._semaphore_reply_ready, th.Semaphore):
+            self._semaphore_reply_ready.release()
         if hasattr(self, '_event_frame_header_in_buffer') and isinstance(self._event_frame_header_in_buffer, th.Event):
             self._event_frame_header_in_buffer.set()
         if hasattr(self, '_event_read') and isinstance(self._event_read, th.Event):
@@ -58,9 +57,8 @@ class Tau2Grabber(Tau):
         buffer += data
         try:
             self._ftdi.write_data(buffer)
-            self._logger.debug(f"Send {data}")
-        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
-            self._logger.debug('Write error.')
+        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError) as e:
+            self._logger.error('Write error ' + str(e))
 
     def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
         if isinstance(yaml_or_dict, Path):
@@ -105,29 +103,27 @@ class Tau2Grabber(Tau):
         while True:
             self._event_read.wait()
             try:
-                data = self._ftdi.read_data(FTDI_PACKET_SIZE)
+                data = self._ftdi.read_data(self._ftdi_read_chunksize)
             except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
+                self._logger.error('Reader failed')
                 return None
             if data is not None and isinstance(self._buffer, BytesBuffer):
                 self._buffer += data
-            if len(generate_subsets_indices_in_string(self._buffer, b'UART')) == self._len_command_in_bytes:
-                self._event_reply_ready.set()
+            if len(generate_subsets_indices_in_string(self._buffer.buffer)) == self._len_command_in_bytes:
+                self._semaphore_reply_ready.release()
                 self._event_read.clear()
 
     def send_command(self, command: ptc.Code, argument: Optional[bytes] = None, 
                      timeout: float = 10.) -> Optional[bytes]:
         data = make_packet(command, argument)
+        self._len_command_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
         with self._lock_parse_command:
             self._buffer.clear_buffer()  # ready for the reply
-            self._len_command_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
-            self._event_read.set()
             self._write(data)
-            self._event_reply_ready.clear()  # counts the number of bytes in the buffer
-            self._event_reply_ready.wait(timeout=timeout)  # blocking until the number of bytes for the reply are reached
+            self._event_read.set()
+            self._semaphore_reply_ready.acquire(timeout=timeout)
             parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
             self._event_read.clear()
-            if parsed_msg is not None:
-                self._logger.debug(f"Received {parsed_msg}")
         return parsed_msg
 
     def grab(self, to_temperature: bool = False):
@@ -135,10 +131,11 @@ class Tau2Grabber(Tau):
             self._buffer.clear_buffer()
 
             while not self._buffer.sync_teax():
-                self._buffer += self._ftdi.read_data(FTDI_PACKET_SIZE)
+                self._buffer += self._ftdi.read_data(self._ftdi_read_chunksize)
 
             while len(self._buffer) < self._frame_size:
-                self._buffer += self._ftdi.read_data(min(FTDI_PACKET_SIZE, self._frame_size - len(self._buffer)))
+                self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize, 
+                                                     self._frame_size - len(self._buffer)))
 
             res = self._buffer[:self._frame_size]
         if not res:

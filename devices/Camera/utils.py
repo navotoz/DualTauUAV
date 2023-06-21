@@ -2,7 +2,7 @@ import binascii
 import re
 import struct
 import threading as th
-from typing import List, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import usb
@@ -12,7 +12,7 @@ from devices.Camera import make_device_from_vid_pid
 from devices.Camera.Tau import tau2_config as ptc
 from devices.Camera.Tau.tau2_config import Code
 
-BUFFER_SIZE = int(2 ** 23)  # 8 MBytes
+BUFFER_SIZE = int(2 ** 24)  # 16 MBytes
 TEAX_LEN = 4
 UART_PREAMBLE_LENGTH = 6
 REPLY_HEADER_BYTES = 10
@@ -34,6 +34,14 @@ class BytesBuffer:
             idx_sync = self._buffer.rfind(b'TEAX')
             if idx_sync != -1:
                 self._buffer = self._buffer[idx_sync + TEAX_LEN:]
+                return True
+            return False
+
+    def sync_uart(self) -> bool:
+        with self._lock:
+            idx_sync = self._buffer.rfind(b'UART')
+            if idx_sync != -1:
+                self._buffer = self._buffer[idx_sync:]
                 return True
             return False
 
@@ -70,15 +78,12 @@ class BytesBuffer:
             return self._buffer
 
 
-def generate_subsets_indices_in_string(input_string: (BytesWarning, bytes, bytes, map, filter),
-                                       subset: (bytes, str)) -> list:
-    reg = re.compile(subset)
-    if isinstance(input_string, BytesBuffer):
-        return [i.start() for i in reg.finditer(input_string())]
+def generate_subsets_indices_in_string(input_string: bytes) -> list:
+    reg = re.compile(b'UART')
     return [i.start() for i in reg.finditer(input_string)]
 
 
-def generate_overlapping_list_chunks(generator: (map, filter), n: int):
+def generate_overlapping_list_chunks(generator: Union[map, filter], n: int):
     lst = list(generator)
     subset_generator = map(lambda idx: lst[idx:idx + n], range(len(lst)))
     return filter(lambda sub: len(sub) == n, subset_generator)
@@ -122,11 +127,11 @@ def is_8bit_image_borders_valid(raw_image_8bit: np.ndarray, height: int) -> bool
     return True
 
 
-def parse_incoming_message(buffer: bytes, command: Code) -> (List, None):
+def parse_incoming_message(buffer: bytes, command: Code) -> Optional[list]:
     len_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
     argument_length = len_in_bytes * UART_PREAMBLE_LENGTH
 
-    idx_list = generate_subsets_indices_in_string(buffer, b'UART')
+    idx_list = generate_subsets_indices_in_string(buffer)
     if not idx_list:
         return None
     try:

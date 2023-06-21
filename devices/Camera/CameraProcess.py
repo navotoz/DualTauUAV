@@ -31,7 +31,7 @@ class CameraCtrl(DeviceAbstract):
         self._camera_params = camera_parameters
         self._event_connected = mp.Event()
         self._event_connected.clear() if not is_dummy else self._event_connected.set()
-        self._lock_measurements = th.RLock()
+        self._lock_measurements = th.Lock()
         self._frames = {}
         self._fpa, self._housing = 0, 0
         self._time_to_save = time_to_save
@@ -99,8 +99,10 @@ class CameraCtrl(DeviceAbstract):
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
                 self._camera._param_position = EnumParameterPosition.DONE
                 self._logger.info('Finished setting parameters.')
-                self._getter_temperature(T_FPA)
-                self._getter_temperature(T_HOUSING)
+                while True:
+                    self._getter_temperature(T_FPA)
+                    sleep(1)
+                # self._getter_temperature(T_HOUSING)
                 self._logger.info(f'Initial temperatures {self._fpa / 100:.2f}C.')
                 self._event_connected.set()
                 self._logger.info('Camera connected.')
@@ -124,22 +126,25 @@ class CameraCtrl(DeviceAbstract):
 
     def _th_getter_temperature(self) -> None:
         self._event_connected.wait()
-        for t_type in cycle([T_FPA, T_HOUSING]):
-            self._getter_temperature(t_type=t_type)
+        while True:
+            self._getter_temperature(t_type=T_FPA)
             sleep(TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS)
+        # for t_type in cycle([T_FPA, T_HOUSING]):
+        #     self._getter_temperature(t_type=t_type)
+        #     sleep(TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS)
 
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
         while self._flag_run:
-            with self._lock_measurements:
-                try:
-                    frame = self._camera.grab() if self._camera is not None else None
-                    time_frame = time_ns()
-                except Exception as e:
-                    self._logger.error(f'Exception in _th_getter_frame: {e}')
-                    self.terminate()
-                if frame is not None:
+            try:
+                frame = self._camera.grab() if self._camera is not None else None
+                time_frame = time_ns()
+            except Exception as e:
+                self._logger.error(f'Exception in _th_getter_frame: {e}')
+                self.terminate()
+            if frame is not None:
+                with self._lock_measurements:
                     self._frames.setdefault('time_ns', []).append(time_frame)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
