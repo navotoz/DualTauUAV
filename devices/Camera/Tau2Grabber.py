@@ -1,40 +1,57 @@
-import logging
-import struct
-from pathlib import Path
-from time import sleep
-from typing import Union, Optional
-
+from time import sleep, time_ns
+from typing import Optional, Union
+from usb.core import USBError
+from pyftdi.ftdi import Ftdi, FtdiError
+import yaml
 import numpy as np
+from pathlib import Path
+import struct
 
-from devices.Camera import CameraAbstract, WIDTH_IMAGE_TAU2, HEIGHT_IMAGE_TAU2, CAMERA_TAU, T_FPA, T_HOUSING
-from devices.Camera.Tau import tau2_config as ptc
-from devices.Camera.Tau.tau2_config import ARGUMENT_FPA, ARGUMENT_HOUSING
+from devices.Camera.utils import connect_ftdi, is_8bit_image_borders_valid, BytesBuffer, \
+    REPLY_HEADER_BYTES, parse_incoming_message, make_packet, generate_subsets_indices_in_string
+from devices.Camera import HEIGHT_IMAGE_TAU2, T_FPA, T_HOUSING, WIDTH_IMAGE_TAU2, EnumParameterPosition
+import devices.Camera.tau2_config as ptc
 from utils.tools import make_logger
-logger = logging.getLogger(__name__)
+
+KELVIN2CELSIUS = 273.15
+SYNC_MSG = b'SYNC' + struct.pack(4 * 'B', *[0, 0, 0, 0])
 
 
-class Tau(CameraAbstract):
-    conn = None
+class Tau2:
     _ffc_mode = None
 
-    def __init__(self, name: str):
-        super().__init__()
+    def __init__(self, vid=0x0403, pid=0x6010, name: str = ''):
         self._logger = make_logger(name=f'{name}Tau2')
-        self._width = WIDTH_IMAGE_TAU2
-        self._height = HEIGHT_IMAGE_TAU2
 
-    def send_command(self, command: ptc.Code, argument: Optional[bytes]) -> Optional[bytes]:
-        raise NotImplementedError
+        try:
+            self._ftdi, address = connect_ftdi(vid, pid)
+        except (RuntimeError, USBError):
+            raise RuntimeError('Could not connect to the Tau2 camera.')
+        self._ftdi_read_chunksize = self._ftdi.read_data_get_chunksize()
+        self.param_position: EnumParameterPosition = EnumParameterPosition.DISCONNECTED
+
+        self._frame_size = 2 * self.height * self.width + 6 + 4 * self.height  # 6 byte header, 4 bytes pad per row
+        self._len_command_in_bytes = 0
+        self._buffer = BytesBuffer(size_to_signal=self._frame_size)
+        self._logger.info(f'Found device in {address}.')
 
     @property
-    def type(self) -> int:
-        return CAMERA_TAU
+    def width(self) -> int:
+        return WIDTH_IMAGE_TAU2
+
+    @property
+    def height(self) -> int:
+        return HEIGHT_IMAGE_TAU2
+
+    def __del__(self) -> None:
+        if hasattr(self, '_ftdi') and isinstance(self._ftdi, Ftdi):
+            self._ftdi.close()
 
     def get_inner_temperature(self, temperature_type: str):
         if T_FPA in temperature_type:
-            arg_hex = ARGUMENT_FPA
+            arg_hex = ptc.ARGUMENT_FPA
         elif T_HOUSING in temperature_type:
-            arg_hex = ARGUMENT_HOUSING
+            arg_hex = ptc.ARGUMENT_HOUSING
         else:
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
@@ -79,16 +96,6 @@ class Tau(CameraAbstract):
         res = self._set_values_with_2bytes_send_recv(mode, current_value, setter_code)
         self._log_set_values(mode, res, f'{name} mode')
         return res
-
-    def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
-        pass
-
-    @property
-    def is_dummy(self) -> bool:
-        return False
-
-    def grab(self, to_temperature: bool) -> np.ndarray:
-        pass
 
     def ffc(self, length: bytes = ptc.FFC_LONG) -> bool:
         prev_mode = self.ffc_mode
@@ -343,3 +350,103 @@ class Tau(CameraAbstract):
             if value == res:
                 self._logger.info(f'Set Lens number to {value + 1}.')
                 return
+
+    def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
+        if isinstance(yaml_or_dict, Path):
+            params = yaml.safe_load(yaml_or_dict)
+        else:
+            params = yaml_or_dict.copy()
+        self.param_position = EnumParameterPosition.CONNECTED
+        self.ffc_mode = params.get('ffc_mode', 'manual')
+        self.param_position = EnumParameterPosition.FFC_MODE
+        self.ffc_period = params.get('ffc_period', 0)  # default is no ffc
+        self.param_position = EnumParameterPosition.FFC_PERIOD
+        self.ace = params.get('ace', 0)
+        self.param_position = EnumParameterPosition.ACE
+        self.tlinear = params.get('tlinear', 0)
+        self.param_position = EnumParameterPosition.TLINEAR
+        self.isotherm = params.get('isotherm', 0)
+        self.param_position = EnumParameterPosition.ISOTHERM
+        self.dde = params.get('dde', 0)
+        self.param_position = EnumParameterPosition.DDE
+        self.gain = params.get('gain', 'high')
+        self.param_position = EnumParameterPosition.GAIN
+        self.agc = params.get('agc', 'manual')
+        self.param_position = EnumParameterPosition.AGC
+        self.sso = params.get('sso', 0)
+        self.param_position = EnumParameterPosition.SSO
+        self.contrast = params.get('contrast', 0)
+        self.param_position = EnumParameterPosition.CONTRAST
+        self.brightness = params.get('brightness', 0)
+        self.param_position = EnumParameterPosition.BRIGHTNESS
+        self.brightness_bias = params.get('brightness_bias', 0)
+        self.param_position = EnumParameterPosition.BRIGHTNESS_BIAS
+        self.cmos_depth = params.get('cmos_depth', 0)  # 14bit pre AGC
+        self.param_position = EnumParameterPosition.CMOS_DEPTH
+        self.fps = params.get('fps', ptc.FPS_CODE_DICT[60])  # 60Hz NTSC
+        self.param_position = EnumParameterPosition.FPS
+        self.lens_number = params.get('lens_number', 1)
+        self.param_position = EnumParameterPosition.LENS_NUMBER
+        # self.correction_mask = params.get('corr_mask', 0)  # Always OFF!!!
+        self.param_position = EnumParameterPosition.DONE
+
+    def _write(self, data: bytes) -> None:
+        buffer = b"UART"
+        buffer += int(len(data)).to_bytes(1, byteorder='big')  # doesn't matter
+        buffer += data
+        try:
+            self._ftdi.write_data(buffer)
+        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError) as e:
+            self._logger.error('Write error ' + str(e))
+
+    def _read(self, timeout: float) -> None:
+        time_start = time_ns()
+        while time_ns() - time_start < timeout * 1e9:
+            try:
+                data = self._ftdi.read_data(self._ftdi_read_chunksize)
+            except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
+                self._logger.error('Reader failed')
+                raise RuntimeError('Reader failed')
+            if data is not None and isinstance(self._buffer, BytesBuffer):
+                self._buffer += data
+            if len(generate_subsets_indices_in_string(self._buffer.buffer)) == self._len_command_in_bytes:
+                break
+
+    def send_command(self, command: ptc.Code, argument: Optional[bytes] = None,
+                     timeout: float = 10.) -> Optional[bytes]:
+        data = make_packet(command, argument)
+        self._len_command_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
+        self._buffer.clear_buffer()  # ready for the reply
+        self._write(data)
+        self._read(timeout=timeout)
+        parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
+        return parsed_msg
+
+    def grab(self, to_temperature: bool = False):
+        self._buffer.clear_buffer()
+
+        while not self._buffer.sync_teax():
+            self._buffer += self._ftdi.read_data(self._ftdi_read_chunksize)
+
+        while len(self._buffer) < self._frame_size:
+            self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize,
+                                                     self._frame_size - len(self._buffer)))
+
+        res = self._buffer[:self._frame_size]
+        if not res:
+            return None
+        magic_word = struct.unpack('h', res[6:8])[0]
+        frame_width = struct.unpack('h', res[1:3])[0] - 2
+        if magic_word != 0x4000 or frame_width != self.width:
+            return None
+        raw_image_8bit = np.frombuffer(res[6:], dtype='uint8')
+        if len(raw_image_8bit) != (2 * (self.width + 2)) * self.height:
+            return None
+        raw_image_8bit = raw_image_8bit.reshape((-1, 2 * (self.width + 2)))
+        if not is_8bit_image_borders_valid(raw_image_8bit, self.height):
+            return None
+
+        raw_image_16bit = 0x3FFF & np.array(raw_image_8bit).view('uint16')[:, 1:-1]
+        if to_temperature:
+            raw_image_16bit = 0.04 * raw_image_16bit - KELVIN2CELSIUS
+        return raw_image_16bit

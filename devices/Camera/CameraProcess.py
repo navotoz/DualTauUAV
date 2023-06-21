@@ -3,7 +3,6 @@ import multiprocessing as mp
 from pathlib import Path
 import threading as th
 from ctypes import c_ushort, c_uint
-from itertools import cycle
 from time import sleep, time_ns
 from typing import Union
 
@@ -11,25 +10,28 @@ import numpy as np
 
 from usb.core import USBError
 
-from devices import DeviceAbstract
-from devices.Camera import CameraAbstract, INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
-from devices.Camera.Tau.Tau2Grabber import Tau2Grabber
+from devices.Camera import INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
+from devices.Camera.Tau2Grabber import Tau2
 
 from utils.tools import make_logger
 TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 5
 
 
-class CameraCtrl(DeviceAbstract):
-    _camera: CameraAbstract = None
+class CameraCtrl(mp.Process):
+    _workers_dict = {}
+    _camera: Tau2 = None
 
     def __init__(self, path_to_save: Union[str, Path], name: str = '', time_to_save: int = 12e10,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
+        self.daemon = False
+
         self._path_to_save = Path(path_to_save)
         if not self._path_to_save.is_dir():
             self._path_to_save.mkdir(parents=True, exist_ok=True)
+        self._lock_camera = th.Lock()
         self._camera_params = camera_parameters
-        self._event_connected = mp.Event()
+        self._event_connected = th.Event()
         self._event_connected.clear() if not is_dummy else self._event_connected.set()
         self._lock_measurements = th.Lock()
         self._frames = {}
@@ -53,55 +55,38 @@ class CameraCtrl(DeviceAbstract):
         self._logger = make_logger(name=f"{name}Process")
         self._logger.info('Created instance.')
 
-    def _terminate_device_specifics(self) -> None:
-        try:
-            self._flag_run.set(False)
-        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError):
-            pass
-        try:
-            self._event_connected.set()
-        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError):
-            pass
-        sleep(0.5)
-        try:
-            self._event_connected.clear()  # so that the is_connected property will return False
-        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError):
-            pass
-        try:
-            self._semaphore_save.release()
-        except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError):
-            pass
+    def terminate(self) -> None:
+        self.kill()
 
-    def _run(self) -> None:
+    def start(self) -> None:
         self._workers_dict['rate'] = th.Thread(target=self._th_rate_camera_function, name='th_dev_rate', daemon=True)
         self._workers_dict['get_t'] = th.Thread(target=self._th_getter_temperature, name='th_cam_get_t', daemon=True)
         self._workers_dict['getter'] = th.Thread(target=self._th_getter_frame, name='th_cam_getter', daemon=False)
         self._workers_dict['dump'] = th.Thread(target=self._th_dump_data, name='th_dump_data', daemon=False)
         self._workers_dict['timer'] = th.Thread(target=self._th_timer, name='th_timer', daemon=True)
         self._workers_dict['conn'] = th.Thread(target=self._th_connect, name='th_cam_conn', daemon=False)
+        [p.start() for p in self._workers_dict.values()]
 
     @property
     def camera_parameters_setting_position(self) -> int:
         return self._param_setting_pos.value
 
     def _update_params(self) -> None:
-        while self._flag_run and self._camera._param_position != EnumParameterPosition.DONE:
-            self._param_setting_pos.value = self._camera._param_position.value
+        while self._camera.param_position != EnumParameterPosition.DONE:
+            self._param_setting_pos.value = self._camera.param_position.value
             sleep(1)
-        self._param_setting_pos.value = self._camera._param_position.value
+        self._param_setting_pos.value = self._camera.param_position.value
 
     def _th_connect(self) -> None:
         self._logger.info('Connecting...')
-        while self._flag_run:
+        while True:
             try:
-                self._camera = Tau2Grabber(name=self._name)
+                self._camera = Tau2(name=self._name)
                 th.Thread(target=self._update_params, daemon=True).start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
-                self._camera._param_position = EnumParameterPosition.DONE
+                self._camera.param_position = EnumParameterPosition.DONE
                 self._logger.info('Finished setting parameters.')
-                while True:
-                    self._getter_temperature(T_FPA)
-                    sleep(1)
+                self._getter_temperature(T_FPA)
                 # self._getter_temperature(T_HOUSING)
                 self._logger.info(f'Initial temperatures {self._fpa / 100:.2f}C.')
                 self._event_connected.set()
@@ -112,7 +97,8 @@ class CameraCtrl(DeviceAbstract):
             sleep(1)
 
     def _getter_temperature(self, t_type: str):  # this function exists for the th_connect function, otherwise redundant
-        t = self._camera.get_inner_temperature(t_type) if self._camera is not None else None
+        with self._lock_camera:
+            t = self._camera.get_inner_temperature(t_type) if isinstance(self._camera, Tau2) else None
         if t is not None and t != 0.0 and t != -float('inf'):
             try:
                 t = round(t * 100)
@@ -136,10 +122,11 @@ class CameraCtrl(DeviceAbstract):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
-        while self._flag_run:
+        while True:
             try:
-                frame = self._camera.grab() if self._camera is not None else None
-                time_frame = time_ns()
+                with self._lock_camera:
+                    frame = self._camera.grab() if self._camera is not None else None
+                    time_frame = time_ns()
             except Exception as e:
                 self._logger.error(f'Exception in _th_getter_frame: {e}')
                 self.terminate()
@@ -149,10 +136,6 @@ class CameraCtrl(DeviceAbstract):
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
                     self._frames.setdefault('housing', []).append(self._housing)
-
-    @property
-    def is_connected(self) -> bool:
-        return self._event_connected.is_set()
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
@@ -182,7 +165,7 @@ class CameraCtrl(DeviceAbstract):
 
     def _th_dump_data(self) -> None:
         self._event_connected.wait()
-        while self._flag_run:  # non-daemon thread, so must use flag_run for loop
+        while True:  # non-daemon thread, so must use flag_run for loop
             self._semaphore_save.acquire()
             now = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             path = (self._path_to_save / f'{now}').with_suffix('.npz')

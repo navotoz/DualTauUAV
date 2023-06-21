@@ -7,10 +7,12 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import usb
 from pyftdi.ftdi import Ftdi
+import usb.core
 
-from devices.Camera import make_device_from_vid_pid
-from devices.Camera.Tau import tau2_config as ptc
-from devices.Camera.Tau.tau2_config import Code
+from devices.Camera.tau2_config import Code
+
+_list_of_connected_camera = []
+
 
 BUFFER_SIZE = int(2 ** 24)  # 16 MBytes
 TEAX_LEN = 4
@@ -69,8 +71,7 @@ class BytesBuffer:
                 return self._buffer[item]
 
     def __call__(self) -> bytes:
-        with self._lock:
-            return self._buffer
+        return self.buffer
 
     @property
     def buffer(self) -> bytes:
@@ -94,6 +95,33 @@ def get_crc(data) -> List[int]:
     crc = binascii.crc_hqx(crc, 0)
     crc = [((crc & 0xFF00) >> 8).to_bytes(1, 'big'), (crc & 0x00FF).to_bytes(1, 'big')]
     return list(map(lambda x: int.from_bytes(x, 'big'), crc))
+
+
+def make_device_from_vid_pid(vid: int, pid: int) -> Tuple[usb.core.Device, str]:
+    device = None
+    devices = usb.core.find(idVendor=vid, idProduct=pid, find_all=True)
+    for d in devices:
+        if d.address in _list_of_connected_camera:
+            continue
+        device = d
+        _list_of_connected_camera.append(d.address)
+        break
+    if not device:
+        raise RuntimeError
+
+    if device.is_kernel_driver_active(0):
+        device.detach_kernel_driver(0)
+
+    device.reset()
+    for cfg in device:
+        for intf in cfg:
+            if device.is_kernel_driver_active(intf.bInterfaceNumber):
+                try:
+                    device.detach_kernel_driver(intf.bInterfaceNumber)
+                except usb.core.USBError as e:
+                    print(f"Could not detach kernel driver from interface({intf.bInterfaceNumber}): {e}")
+    device.set_configuration(1)
+    return device, d.address
 
 
 def connect_ftdi(vid, pid) -> Tuple[Ftdi, str]:
@@ -155,7 +183,7 @@ def parse_incoming_message(buffer: bytes, command: Code) -> Optional[list]:
     return ret_value
 
 
-def make_packet(command: ptc.Code, argument: (bytes, None) = None) -> bytes:
+def make_packet(command: Code, argument: Optional[bytes] = None) -> bytes:
     if argument is None:
         argument = []
 
