@@ -84,8 +84,7 @@ def generate_subsets_indices_in_string(input_string: bytes) -> list:
     return [i.start() for i in reg.finditer(input_string)]
 
 
-def generate_overlapping_list_chunks(generator: Union[map, filter], n: int):
-    lst = list(generator)
+def generate_overlapping_list_chunks(lst: list, n: int):
     subset_generator = map(lambda idx: lst[idx:idx + n], range(len(lst)))
     return filter(lambda sub: len(sub) == n, subset_generator)
 
@@ -157,15 +156,12 @@ def is_8bit_image_borders_valid(raw_image_8bit: np.ndarray, height: int) -> bool
 
 def parse_incoming_message(buffer: bytes, command: Code) -> Optional[list]:
     len_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
-    argument_length = len_in_bytes * UART_PREAMBLE_LENGTH
-
-    idx_list = generate_subsets_indices_in_string(buffer)
-    if not idx_list:
+    buffer = [p for p in buffer]
+    if not buffer:
         return None
+
     try:
-        data = map(lambda idx: buffer[idx:idx + argument_length][5::6], idx_list)
-        data = map(lambda d: d[0], data)
-        data = generate_overlapping_list_chunks(data, len_in_bytes)
+        data = generate_overlapping_list_chunks(buffer, len_in_bytes)
         data = filter(lambda res: len(res) >= len_in_bytes, data)  # length of message at least as expected
         data = filter(lambda res: res[0] == 110, data)  # header is 0x6E (110)
         data = list(filter(lambda res: res[3] == command.code, data))
@@ -173,11 +169,14 @@ def parse_incoming_message(buffer: bytes, command: Code) -> Optional[list]:
         data = None
     if not data:
         return None
-    data = data[-1]
-    crc_1 = get_crc(data[:6])
-    crc_2 = get_crc(data[8:8 + command.reply_bytes])
-    if not crc_1 == data[6:8] or not crc_2 == data[-2:]:
+    for idx, d in enumerate(data):
+        crc_1 = get_crc(d[:6])
+        crc_2 = get_crc(d[8:8 + command.reply_bytes])
+        if not crc_1 == d[6:8] or not crc_2 == d[-2:]:
+            data[idx] = None
+    if not data or all([p is None for p in data]):
         return None
+    data = data[-1]
     ret_value = data[8:8 + command.reply_bytes]
     ret_value = struct.pack('<' + len(ret_value) * 'B', *ret_value)
     return ret_value

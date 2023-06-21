@@ -14,7 +14,7 @@ from devices.Camera import INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParamet
 from devices.Camera.Tau2Grabber import Tau2
 
 from utils.tools import make_logger
-TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 5
+TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 10
 
 
 class CameraCtrl(mp.Process):
@@ -36,6 +36,7 @@ class CameraCtrl(mp.Process):
         self._lock_measurements = th.Lock()
         self._frames = {}
         self._fpa, self._housing = 0, 0
+        self._fpa_update_time = time_ns()
         self._time_to_save = time_to_save
 
         # process-safe param setting position
@@ -59,12 +60,12 @@ class CameraCtrl(mp.Process):
         self.kill()
 
     def start(self) -> None:
-        self._workers_dict['rate'] = th.Thread(target=self._th_rate_camera_function, name='th_dev_rate', daemon=True)
-        self._workers_dict['get_t'] = th.Thread(target=self._th_getter_temperature, name='th_cam_get_t', daemon=True)
-        self._workers_dict['getter'] = th.Thread(target=self._th_getter_frame, name='th_cam_getter', daemon=False)
-        self._workers_dict['dump'] = th.Thread(target=self._th_dump_data, name='th_dump_data', daemon=False)
-        self._workers_dict['timer'] = th.Thread(target=self._th_timer, name='th_timer', daemon=True)
-        self._workers_dict['conn'] = th.Thread(target=self._th_connect, name='th_cam_conn', daemon=False)
+        self._workers_dict['rate'] = th.Thread(target=self._th_rate_camera_function, name=f'th_dev_rate_{self._name}', daemon=True)
+        self._workers_dict['get_t'] = th.Thread(target=self._th_getter_temperature, name=f'th_cam_get_t_{self._name}', daemon=True)
+        self._workers_dict['getter'] = th.Thread(target=self._th_getter_frame, name=f'th_cam_getter_{self._name}', daemon=False)
+        self._workers_dict['dump'] = th.Thread(target=self._th_dump_data, name=f'th_dump_data_{self._name}', daemon=False)
+        self._workers_dict['timer'] = th.Thread(target=self._th_timer, name=f'th_timer_{self._name}', daemon=True)
+        self._workers_dict['conn'] = th.Thread(target=self._th_connect, name=f'th_cam_conn_{self._name}', daemon=False)
         [p.start() for p in self._workers_dict.values()]
 
     @property
@@ -105,6 +106,7 @@ class CameraCtrl(mp.Process):
                 with self._lock_measurements:
                     if t_type == T_FPA:
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
+                        self._fpa_update_time = time_ns()
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
             except (BrokenPipeError, RuntimeError):
@@ -135,7 +137,8 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('time_ns', []).append(time_frame)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
-                    self._frames.setdefault('housing', []).append(self._housing)
+                    self._frames.setdefault('fpa_update_time', []).append(self._fpa_update_time)
+                    # self._frames.setdefault('housing', []).append(self._housing)
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
@@ -178,7 +181,8 @@ class CameraCtrl(mp.Process):
             np.savez(str(path),
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
-                     housing=np.stack(data['housing']),
+                    #  housing=np.stack(data['housing']),
+                     fpa_update_time=np.stack(data['fpa_update_time']),
                      time_ns=np.stack(data['time_ns']))
             self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1

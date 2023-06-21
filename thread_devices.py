@@ -26,6 +26,16 @@ class ThreadDevices(th.Thread):
         self._camera_mono.start()
         self._camera_pan.start()
 
+    def __del__(self) -> None:
+        try:
+            self._camera_mono.terminate()
+        except:
+            pass
+        try:
+            self._camera_pan.terminate()
+        except:
+            pass
+
     @property
     def rate_pan(self):
         return self._camera_pan.rate_camera

@@ -4,6 +4,9 @@ class Code:
         self.cmd_bytes = cmd_bytes
         self.reply_bytes = reply_bytes
 
+    def __repr__(self) -> str:
+        return f"Code(decimal={self.__code}, hex=0x{self.__code:x})"
+
     @property
     def code(self) -> int:
         return self.__code

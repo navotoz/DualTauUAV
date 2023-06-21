@@ -55,7 +55,7 @@ class Tau2:
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
         argument = struct.pack(">h", arg_hex)
-        res = self.send_command(command=command, argument=argument, timeout=10.0)
+        res = self.send_command(command=command, argument=argument, timeout=6.0)
         if res:
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0
@@ -390,34 +390,39 @@ class Tau2:
         self.param_position = EnumParameterPosition.DONE
 
     def _write(self, data: bytes) -> None:
-        buffer = b"UART"
-        buffer += int(len(data)).to_bytes(1, byteorder='big')  # doesn't matter
-        buffer += data
         try:
-            self._ftdi.write_data(buffer)
+            self._ftdi.write_data(data)
         except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError) as e:
             self._logger.error('Write error ' + str(e))
 
-    def _read(self, timeout: float, length_of_command_in_bytes: int) -> None:
+    def _read(self, timeout: float, length_of_command_in_bytes: int) -> bytes:
         time_start = time_ns()
-        while time_ns() - time_start < timeout * 1e9:
+        buffer = b''
+        while time_ns() - time_start <  0.5 * 1e9:
             try:
                 data = self._ftdi.read_data(self._ftdi_read_chunksize)
             except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
                 self._logger.error('Reader failed')
                 raise RuntimeError('Reader failed')
-            if data is not None and isinstance(self._buffer, BytesBuffer):
-                self._buffer += data
-            if len(generate_subsets_indices_in_string(self._buffer.buffer)) == length_of_command_in_bytes:
+            if data is not None:
+                buffer += data
+            if len(buffer) >= length_of_command_in_bytes:
                 break
+        return buffer
 
     def send_command(self, command: ptc.Code, argument: Optional[bytes] = None,
                      timeout: float = 10.) -> Optional[bytes]:
         data = make_packet(command, argument)
+        self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
         self._buffer.clear_buffer()  # ready for the reply
-        self._write(data)
-        self._read(timeout=timeout, length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
-        parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
+        time_start = time_ns()
+        while time_ns() - time_start <= timeout * 1e9:
+            self._write(data)
+            ret_val = self._read(timeout=timeout, length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
+            parsed_msg = parse_incoming_message(buffer=ret_val, command=command)
+            if parsed_msg is not None:
+                break
+        self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
         return parsed_msg
 
     def grab(self, to_temperature: bool = False):
