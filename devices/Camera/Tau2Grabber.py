@@ -31,7 +31,6 @@ class Tau2:
         self.param_position: EnumParameterPosition = EnumParameterPosition.DISCONNECTED
 
         self._frame_size = 2 * self.height * self.width + 6 + 4 * self.height  # 6 byte header, 4 bytes pad per row
-        self._len_command_in_bytes = 0
         self._buffer = BytesBuffer(size_to_signal=self._frame_size)
         self._logger.info(f'Found device in {address}.')
 
@@ -399,7 +398,7 @@ class Tau2:
         except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError) as e:
             self._logger.error('Write error ' + str(e))
 
-    def _read(self, timeout: float) -> None:
+    def _read(self, timeout: float, length_of_command_in_bytes: int) -> None:
         time_start = time_ns()
         while time_ns() - time_start < timeout * 1e9:
             try:
@@ -409,16 +408,15 @@ class Tau2:
                 raise RuntimeError('Reader failed')
             if data is not None and isinstance(self._buffer, BytesBuffer):
                 self._buffer += data
-            if len(generate_subsets_indices_in_string(self._buffer.buffer)) == self._len_command_in_bytes:
+            if len(generate_subsets_indices_in_string(self._buffer.buffer)) == length_of_command_in_bytes:
                 break
 
     def send_command(self, command: ptc.Code, argument: Optional[bytes] = None,
                      timeout: float = 10.) -> Optional[bytes]:
         data = make_packet(command, argument)
-        self._len_command_in_bytes = command.reply_bytes + REPLY_HEADER_BYTES
         self._buffer.clear_buffer()  # ready for the reply
         self._write(data)
-        self._read(timeout=timeout)
+        self._read(timeout=timeout, length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
         parsed_msg = parse_incoming_message(buffer=self._buffer.buffer, command=command)
         return parsed_msg
 
