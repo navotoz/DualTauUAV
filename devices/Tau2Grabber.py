@@ -55,7 +55,7 @@ class Tau2:
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
         argument = struct.pack(">h", arg_hex)
-        res = self.send_command(command=command, argument=argument, timeout=6.0)
+        res = self.send_command(command=command, argument=argument, timeout=2.0)
         if res:
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0
@@ -429,7 +429,6 @@ class Tau2:
                      timeout: float = 10.) -> Optional[bytes]:
         data = make_packet(command, argument)
         self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
-        self._buffer.clear_buffer()  # ready for the reply
         time_start = time_ns()
         while time_ns() - time_start <= timeout * 1e9:
             self._write(data)
@@ -440,18 +439,22 @@ class Tau2:
         self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
         return parsed_msg
 
-    def grab(self, to_temperature: bool = False):
+    def grab(self, to_temperature: bool = False, timeout_ns: float = 6e8):
+        time_start = time_ns()
         self._buffer.clear_buffer()
 
-        while not self._buffer.sync_teax():
+        while time_ns() - time_start < timeout_ns:
+            if self._buffer.sync_teax():
+                break
             self._buffer += self._ftdi.read_data(self._ftdi_read_chunksize)
 
-        while len(self._buffer) < self._frame_size:
-            self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize,
-                                                     self._frame_size - len(self._buffer)))
+        while time_ns() - time_start < timeout_ns:
+            if len(self._buffer) >= self._frame_size:
+                break
+            self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize, self._frame_size - len(self._buffer)))
 
         res = self._buffer[:self._frame_size]
-        if not res:
+        if len(res) < 8:  # must have at least 8 bytes to find the magic word and frame width
             return None
         magic_word = struct.unpack('h', res[6:8])[0]
         frame_width = struct.unpack('h', res[1:3])[0] - 2

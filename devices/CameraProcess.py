@@ -21,7 +21,7 @@ class CameraCtrl(mp.Process):
     _workers_dict = {}
     _camera: Tau2 = None
 
-    def __init__(self, path_to_save: Union[str, Path], name: str = '', time_to_save: int = 12e10,
+    def __init__(self, path_to_save: Union[str, Path], name: str = '', time_to_save: int = 10e9,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
@@ -47,6 +47,8 @@ class CameraCtrl(mp.Process):
         self._rate_camera: mp.Value = mp.Value(c_uint)
         self._semaphore_get_rate = mp.Semaphore(value=0)
         self._semaphore_set_rate = mp.Semaphore(value=0)
+        self._n_frames = 0
+        self._time_start = time_ns()
 
         # Thread-safe saving
         self._semaphore_save = th.Semaphore(value=0)
@@ -128,6 +130,7 @@ class CameraCtrl(mp.Process):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
+        self._time_start = time_ns()
         while True:
             try:
                 with self._lock_camera:
@@ -143,16 +146,14 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('fpa', []).append(self._fpa)
                     self._frames.setdefault('fpa_update_time', []).append(self._fpa_update_time)
                     # self._frames.setdefault('housing', []).append(self._housing)
+                    self._n_frames += 1
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
             self._semaphore_set_rate.acquire()
             with self._lock_measurements:
-                times = self._frames.get('time_ns', [])
-            try:
-                self._rate_camera.value = int(len(times) * 1e9 / (times[-1] - times[0]))
-            except (IndexError, ZeroDivisionError):
-                self._rate_camera.value = 0
+                n_frames = self._n_frames
+            self._rate_camera.value = int(n_frames * 1e9 / (time_ns() - self._time_start))
             self._semaphore_get_rate.release()
 
     @property
@@ -168,7 +169,7 @@ class CameraCtrl(mp.Process):
             if time_ns() - timer >= self._time_to_save:
                 self._semaphore_save.release()
                 timer = time_ns()
-            sleep(2)
+            sleep(1)
 
     def _th_dump_data(self) -> None:
         self._event_connected.wait()
@@ -177,7 +178,7 @@ class CameraCtrl(mp.Process):
             now = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             path = (self._path_to_save / f'{now}').with_suffix('.npz')
             with self._lock_measurements:
-                if not self._frames:
+                if not isinstance(self._frames, dict) or not self._frames.get('time_ns', []):
                     continue
                 data = self._frames
                 self._frames = {}
