@@ -65,7 +65,7 @@ class Tau2:
         return res
 
     def _get_values_without_arguments(self, command: ptc.Code) -> int:
-        res = self.send_command(command=command, argument=None, timeout=10)
+        res = self.send_command(command=command, argument=None, timeout=1)
         if res is None:
             return 0xffff
         fmt = 'h' if len(res) == 2 else 'hh'
@@ -74,7 +74,7 @@ class Tau2:
     def _set_values_with_2bytes_send_recv(self, value: int, current_value: int, command: ptc.Code) -> bool:
         if value == current_value:
             return True
-        res = self.send_command(command=command, argument=struct.pack('>h', value), timeout=10)
+        res = self.send_command(command=command, argument=struct.pack('>h', value), timeout=1)
         if res and struct.unpack('>h', res)[0] == value:
             return True
         return False
@@ -102,7 +102,7 @@ class Tau2:
             while 'man' not in self.ffc_mode:
                 self.ffc_mode = ptc.FFC_MODE_CODE_DICT['manual']
             sleep(0.2)
-        res = self.send_command(command=ptc.DO_FFC, argument=length, timeout=10)
+        res = self.send_command(command=ptc.DO_FFC, argument=length, timeout=1)
         sleep(0.2)
         if 'ext' in prev_mode:
             while 'ext' not in self.ffc_mode:
@@ -183,7 +183,7 @@ class Tau2:
 
     @property
     def sso(self) -> int:
-        res = self.send_command(command=ptc.GET_AGC_THRESHOLD, argument=struct.pack('>h', 0x0400), timeout=10)
+        res = self.send_command(command=ptc.GET_AGC_THRESHOLD, argument=struct.pack('>h', 0x0400), timeout=1)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     @sso.setter
@@ -191,7 +191,7 @@ class Tau2:
         if percentage == self.sso:
             self._logger.info(f'Set SSO to {percentage}')
             return
-        self.send_command(command=ptc.SET_AGC_THRESHOLD, argument=struct.pack('>hh', 0x0400, percentage), timeout=10)
+        self.send_command(command=ptc.SET_AGC_THRESHOLD, argument=struct.pack('>hh', 0x0400, percentage), timeout=1)
         if self.sso == percentage:
             self._logger.info(f'Set SSO to {percentage}%')
             return
@@ -244,7 +244,7 @@ class Tau2:
 
     @property
     def tlinear(self):
-        res = self.send_command(command=ptc.GET_TLINEAR_MODE, argument=struct.pack('>h', 0x0040), timeout=10)
+        res = self.send_command(command=ptc.GET_TLINEAR_MODE, argument=struct.pack('>h', 0x0040), timeout=1)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     @tlinear.setter
@@ -252,20 +252,20 @@ class Tau2:
         if value == self.tlinear:
             self._logger.info(f'Set TLinear to {value}.')
             return
-        self.send_command(command=ptc.SET_TLINEAR_MODE, argument=struct.pack('>hh', 0x0040, value), timeout=10)
+        self.send_command(command=ptc.SET_TLINEAR_MODE, argument=struct.pack('>hh', 0x0040, value), timeout=1)
         if value == self.tlinear:
             self._log_set_values(value, True, 'tlinear mode')
             return
         self._log_set_values(value, False, 'tlinear mode')
 
     def _digital_output_getter(self, command: ptc.Code, argument: bytes):
-        res = self.send_command(command=command, argument=argument, timeout=10)
+        res = self.send_command(command=command, argument=argument, timeout=1)
         return struct.unpack('>h', res)[0] if res else 0xffff
 
     def _digital_output_setter(self, mode: int, current_mode: int, command: ptc.Code, argument: int) -> bool:
         if mode == current_mode:
             return True
-        res = self.send_command(command=command, argument=struct.pack('>bb', argument, mode), timeout=10)
+        res = self.send_command(command=command, argument=struct.pack('>bb', argument, mode), timeout=1)
         if res and struct.unpack('>bb', res)[-1] == mode:
             return True
         return False
@@ -315,7 +315,7 @@ class Tau2:
         self._mode_setter(mode, self.fps, ptc.SET_FPS, ptc.FPS_CODE_DICT, 'FPS')
 
     def reset(self):
-        return self.send_command(command=ptc.CAMERA_RESET, argument=None, timeout=10)
+        return self.send_command(command=ptc.CAMERA_RESET, argument=None, timeout=1)
 
     @property
     def ace(self):
@@ -326,7 +326,7 @@ class Tau2:
         if not -8 <= value <= 8:
             return
         for _ in range(5):
-            self.send_command(command=ptc.SET_AGC_ACE_CORRECT, argument=struct.pack('>h', value), timeout=10)
+            self.send_command(command=ptc.SET_AGC_ACE_CORRECT, argument=struct.pack('>h', value), timeout=1)
             if value == self.ace:
                 self._logger.info(f'Set ACE to {value}.')
                 return
@@ -341,7 +341,7 @@ class Tau2:
             return
         value -= 1  # the terms of lenses is 0x0001 or 0x0000
         for _ in range(5):
-            res = self.send_command(command=ptc.SET_LENS_NUMBER, argument=struct.pack('>h', value), timeout=10)
+            res = self.send_command(command=ptc.SET_LENS_NUMBER, argument=struct.pack('>h', value), timeout=1)
             try:
                 res = struct.unpack('>h', res)[0]
             except (TypeError, struct.error, IndexError, RuntimeError, AttributeError):
@@ -426,17 +426,22 @@ class Tau2:
         return buffer
 
     def send_command(self, command: ptc.Code, argument: Optional[bytes] = None, timeout: float = 1.) -> Optional[bytes]:
-        data = make_packet(command, argument)
-        self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
-        time_start = time_ns()
-        while time_ns() - time_start <= timeout * 1e9:
-            self._write(data)
-            ret_val = self._read(length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
-            parsed_msg = parse_incoming_message(buffer=ret_val, command=command)
-            if parsed_msg is not None:
-                break
-        self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
-        return parsed_msg
+        parsed_msg = None
+        try:
+            data = make_packet(command, argument)
+            self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
+            time_start = time_ns()
+            while time_ns() - time_start <= timeout * 1e9:
+                self._write(data)
+                ret_val = self._read(length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
+                parsed_msg = parse_incoming_message(buffer=ret_val, command=command)
+                if parsed_msg is not None:
+                    break
+        except Exception as e:
+            self._logger.error(f"Failed to send command: {str(e)}")
+        finally:
+            self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
+            return parsed_msg
 
     def grab(self, to_temperature: bool = False, timeout_ns: float = 2e8):
         time_start = time_ns()
