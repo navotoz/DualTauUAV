@@ -16,10 +16,10 @@ class ThreadDevices(th.Thread):
         # Init two cameras - Panchromatic and Monochromatic
         params = INIT_CAMERA_PARAMETERS
         params['ffc_mode'] = 'auto'
-        params['ffc_period'] = 1800
+        params['ffc_period'] = 3600  # ffc every one minute
 
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
-                           time_to_save=10e9)  # dump to disk every 15 seconds
+                           time_to_save=5e9)  # dump to disk every 5 seconds
         self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 
