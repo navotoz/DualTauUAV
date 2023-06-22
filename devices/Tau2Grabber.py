@@ -55,7 +55,7 @@ class Tau2:
             raise TypeError(f'{temperature_type} was not implemented as an inner temperature of TAU2.')
         command = ptc.READ_SENSOR_TEMPERATURE
         argument = struct.pack(">h", arg_hex)
-        res = self.send_command(command=command, argument=argument, timeout=2.0)
+        res = self.send_command(command=command, argument=argument, timeout=1)
         if res:
             res = struct.unpack(">H", res)[0]
             res /= 10.0 if temperature_type == T_FPA else 100.0
@@ -413,7 +413,7 @@ class Tau2:
     def _read(self, length_of_command_in_bytes: int) -> bytes:
         time_start = time_ns()
         buffer = b''
-        while time_ns() - time_start < 0.5 * 1e9:
+        while time_ns() - time_start < 5e8:
             try:
                 data = self._ftdi.read_data(self._ftdi_read_chunksize)
             except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):
@@ -425,8 +425,7 @@ class Tau2:
                 break
         return buffer
 
-    def send_command(self, command: ptc.Code, argument: Optional[bytes] = None,
-                     timeout: float = 10.) -> Optional[bytes]:
+    def send_command(self, command: ptc.Code, argument: Optional[bytes] = None, timeout: float = 1.) -> Optional[bytes]:
         data = make_packet(command, argument)
         self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
         time_start = time_ns()
@@ -439,7 +438,7 @@ class Tau2:
         self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
         return parsed_msg
 
-    def grab(self, to_temperature: bool = False, timeout_ns: float = 6e8):
+    def grab(self, to_temperature: bool = False, timeout_ns: float = 2e8):
         time_start = time_ns()
         self._buffer.clear_buffer()
 
