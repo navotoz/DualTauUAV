@@ -14,7 +14,7 @@ from devices import INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosit
 from devices.Tau2Grabber import Tau2
 
 from utils.tools import make_logger
-TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 60
+TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 30
 
 
 class CameraCtrl(mp.Process):
