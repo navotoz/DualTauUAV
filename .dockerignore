@@ -4,5 +4,7 @@
 **/.vscode/
 *.pyc
 **/measurements/
-.step
-.STEP
+*.step
+*.STEP
+*.STL
+*.stl
