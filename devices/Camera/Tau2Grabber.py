@@ -395,7 +395,7 @@ class Tau2:
         except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError) as e:
             self._logger.error('Write error ' + str(e))
 
-    def _read(self, timeout: float, length_of_command_in_bytes: int) -> bytes:
+    def _read(self, length_of_command_in_bytes: int) -> bytes:
         time_start = time_ns()
         buffer = b''
         while time_ns() - time_start <  0.5 * 1e9:
@@ -418,7 +418,7 @@ class Tau2:
         time_start = time_ns()
         while time_ns() - time_start <= timeout * 1e9:
             self._write(data)
-            ret_val = self._read(timeout=timeout, length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
+            ret_val = self._read(length_of_command_in_bytes=command.reply_bytes + REPLY_HEADER_BYTES)
             parsed_msg = parse_incoming_message(buffer=ret_val, command=command)
             if parsed_msg is not None:
                 break
