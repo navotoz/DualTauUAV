@@ -1,5 +1,6 @@
 from functools import partial
 import threading as th
+from time import sleep
 
 from devices import INIT_CAMERA_PARAMETERS, EnumParameterPosition
 from devices.CameraProcess import CameraCtrl
@@ -18,12 +19,14 @@ class ThreadDevices(th.Thread):
         params['ffc_period'] = 1800
 
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
-                           time_to_save=15e9)  # dump to disk every 15 seconds
+                           time_to_save=10e9)  # dump to disk every 15 seconds
         self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 
     def run(self) -> None:
         self._camera_mono.start()
+        while self._camera_mono.camera_parameters_setting_position != EnumParameterPosition.DONE.value:
+            sleep(1)
         self._camera_pan.start()
 
     def __del__(self) -> None:
