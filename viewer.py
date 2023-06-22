@@ -110,7 +110,8 @@ def save_key(event):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path_to_files', type=str, required=True)
+    parser.add_argument('--files_pan', type=str, required=True)
+    parser.add_argument('--files_mono', type=str, required=True)
     args = parser.parse_args()
 
     root = tk.Tk()

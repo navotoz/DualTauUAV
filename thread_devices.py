@@ -18,7 +18,7 @@ class ThreadDevices(th.Thread):
         params['ffc_period'] = 1800
 
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
-                           time_to_save=30e9)  # dump to disk every 15 seconds
+                           time_to_save=15e9)  # dump to disk every 15 seconds
         self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 
