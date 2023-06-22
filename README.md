@@ -52,3 +52,18 @@ docker compose up -d
 ```
 
 - The `restart` option on the `docker-compose.yaml` is set to `always`, so the docker should run automatically on boot.
+
+# Undervoltage in the RPi
+- In terminal:
+```vcgencmd get_throttled```
+Bit	Hex Value	Meaning
+0	1	Under-voltage detected
+1	2	ARM frequency has been caped
+2	4	Currently throttled
+3	8	Soft temperature limit is active
+16	1000	Under-voltage has occurred
+17	2000	ARM frequency capping has occurred
+18	4000	Throttling has occurred
+19	8000	Soft temperature limit has occurred
+
+https://pimylifeup.com/raspberry-pi-low-voltage-warning/
