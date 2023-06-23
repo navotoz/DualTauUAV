@@ -1,8 +1,8 @@
 from functools import partial
 import threading as th
 
-from devices.Camera import INIT_CAMERA_PARAMETERS, EnumParameterPosition
-from devices.Camera.CameraProcess import CameraCtrl
+from devices import INIT_CAMERA_PARAMETERS, EnumParameterPosition
+from devices.CameraProcess import CameraCtrl
 NAME_DEVICES_THREAD = 'th_devices'
 
 

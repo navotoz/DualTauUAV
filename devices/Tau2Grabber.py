@@ -7,10 +7,10 @@ import numpy as np
 from pathlib import Path
 import struct
 
-from devices.Camera.utils import connect_ftdi, is_8bit_image_borders_valid, BytesBuffer, \
-    REPLY_HEADER_BYTES, parse_incoming_message, make_packet, generate_subsets_indices_in_string
-from devices.Camera import HEIGHT_IMAGE_TAU2, T_FPA, T_HOUSING, WIDTH_IMAGE_TAU2, EnumParameterPosition
-import devices.Camera.tau2_config as ptc
+from devices.utils import connect_ftdi, is_8bit_image_borders_valid, BytesBuffer, \
+    REPLY_HEADER_BYTES, parse_incoming_message, make_packet
+from devices import HEIGHT_IMAGE_TAU2, T_FPA, T_HOUSING, WIDTH_IMAGE_TAU2, EnumParameterPosition
+import devices.tau2_config as ptc
 from utils.tools import make_logger
 
 KELVIN2CELSIUS = 273.15
@@ -398,7 +398,7 @@ class Tau2:
     def _read(self, length_of_command_in_bytes: int) -> bytes:
         time_start = time_ns()
         buffer = b''
-        while time_ns() - time_start <  0.5 * 1e9:
+        while time_ns() - time_start < 0.5 * 1e9:
             try:
                 data = self._ftdi.read_data(self._ftdi_read_chunksize)
             except (ValueError, TypeError, AttributeError, RuntimeError, NameError, KeyError, FtdiError):

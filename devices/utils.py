@@ -2,14 +2,14 @@ import binascii
 import re
 import struct
 import threading as th
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import numpy as np
 import usb
 from pyftdi.ftdi import Ftdi
 import usb.core
 
-from devices.Camera.tau2_config import Code
+from devices.tau2_config import Code
 
 _list_of_connected_camera = []
 

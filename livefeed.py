@@ -2,7 +2,7 @@ import pyftdi.ftdi
 from PIL import ImageTk
 
 import tkinter as tk
-from devices.Camera.Tau2Grabber import Tau2
+from devices.Tau2Grabber import Tau2
 
 from utils.misc import normalize_image
 

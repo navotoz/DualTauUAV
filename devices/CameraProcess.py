@@ -10,8 +10,8 @@ import numpy as np
 
 from usb.core import USBError
 
-from devices.Camera import INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
-from devices.Camera.Tau2Grabber import Tau2
+from devices import INIT_CAMERA_PARAMETERS, T_HOUSING, T_FPA, EnumParameterPosition
+from devices.Tau2Grabber import Tau2
 
 from utils.tools import make_logger
 TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS = 10
@@ -60,10 +60,14 @@ class CameraCtrl(mp.Process):
         self.kill()
 
     def start(self) -> None:
-        self._workers_dict['rate'] = th.Thread(target=self._th_rate_camera_function, name=f'th_dev_rate_{self._name}', daemon=True)
-        self._workers_dict['get_t'] = th.Thread(target=self._th_getter_temperature, name=f'th_cam_get_t_{self._name}', daemon=True)
-        self._workers_dict['getter'] = th.Thread(target=self._th_getter_frame, name=f'th_cam_getter_{self._name}', daemon=False)
-        self._workers_dict['dump'] = th.Thread(target=self._th_dump_data, name=f'th_dump_data_{self._name}', daemon=False)
+        self._workers_dict['rate'] = th.Thread(target=self._th_rate_camera_function,
+                                               name=f'th_dev_rate_{self._name}', daemon=True)
+        self._workers_dict['get_t'] = th.Thread(target=self._th_getter_temperature,
+                                                name=f'th_cam_get_t_{self._name}', daemon=True)
+        self._workers_dict['getter'] = th.Thread(target=self._th_getter_frame,
+                                                 name=f'th_cam_getter_{self._name}', daemon=False)
+        self._workers_dict['dump'] = th.Thread(
+            target=self._th_dump_data, name=f'th_dump_data_{self._name}', daemon=False)
         self._workers_dict['timer'] = th.Thread(target=self._th_timer, name=f'th_timer_{self._name}', daemon=True)
         self._workers_dict['conn'] = th.Thread(target=self._th_connect, name=f'th_cam_conn_{self._name}', daemon=False)
         [p.start() for p in self._workers_dict.values()]
@@ -181,7 +185,7 @@ class CameraCtrl(mp.Process):
             np.savez(str(path),
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
-                    #  housing=np.stack(data['housing']),
+                     #  housing=np.stack(data['housing']),
                      fpa_update_time=np.stack(data['fpa_update_time']),
                      time_ns=np.stack(data['time_ns']))
             self._logger.info(f'Dumped image {str(path)}')
