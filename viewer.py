@@ -12,8 +12,10 @@ from PIL import ImageTk
 from PIL import Image
 from tqdm import tqdm
 
-HEIGHT_VIEWER = int(2 * 336)
-WIDTH_VIEWER = int(2 * 256)
+WIDTH_VIEWER = int(2 * 336)
+HEIGHT_VIEWER = int(2 * 256)
+low_frame = -1
+high_frame = -1
 
 
 def normalize_image(image: np.ndarray) -> Image.Image:
@@ -33,8 +35,8 @@ def normalize_image(image: np.ndarray) -> Image.Image:
 def load(path) -> List[Image.Image]:
     try:
         return {k: v for k, v in np.load(str(path)).items()}
-    except BadZipFile:
-        raise RuntimeError(f"File {path} is corrupted.")
+    except (BadZipFile, EOFError):
+        return None
     except ValueError:
         return tifffile.imread(str(path))
 
@@ -42,7 +44,7 @@ def load(path) -> List[Image.Image]:
 def load_all_files_from_path(path: Path) -> Dict[str, np.ndarray]:
     path = Path(path)
     if path.is_file():
-        data = load(path)
+        return load(path)
     elif not path.is_dir():
         raise NotADirectoryError(f'{path}')
     else:
@@ -57,6 +59,7 @@ def load_all_files_from_path(path: Path) -> Dict[str, np.ndarray]:
             data = list(tqdm(pool.imap(load, list_images), total=len(list_images), desc='Load images'))
         if not data:
             raise RuntimeError('Images were not loaded.')
+        data = list(filter(lambda x: x is not None, data))
 
         data_combined = {}
         for d in data:
@@ -94,6 +97,28 @@ def right_key(event):
     slider.set(min(slider.get() + 1, len(images)))
 
 
+def mark_low_frame(event):
+    global low_frame
+    low_frame = slider.get()
+    print(f'Lowest frame number: {low_frame}')
+
+
+def mark_high_frame(event):
+    global high_frame
+    high_frame = slider.get()
+    print(f'Highest frame number: {high_frame}')
+
+
+def save_single_file(event):
+    global low_frame, high_frame
+    if low_frame == -1:
+        low_frame = 0
+    if high_frame == -1:
+        high_frame = len(images)
+    np.savez(Path(args.files).parent / f"{'mono' if '/mono' in args.files else 'pan'}.npz", 
+             **{k: v[low_frame:high_frame] for k, v in data.items()})
+
+
 def save_key(event):
     images[slider.get()].save(path_____ / f'{slider.get()}.png')
 
@@ -107,10 +132,15 @@ if __name__ == "__main__":
     root.protocol('WM_DELETE_WINDOW', closer)
     root.title("Tau2 Images Viewer")
     root.option_add("*Font", "TkDefaultFont 14")
-    root.geometry(f"{HEIGHT_VIEWER}x{WIDTH_VIEWER}")
+    root.geometry(f"{WIDTH_VIEWER}x{HEIGHT_VIEWER}")
     root.pack_propagate(0)
 
     data = load_all_files_from_path(args.files)
+
+    # # rotate all frames by 90 degrees
+    # for k, v in data.items():
+    #     if k == 'frames':
+    #         data[k] = np.rot90(v, axes=(1, 2))
 
     # Normalize data
     images = [normalize_image(p) for p in tqdm(data['frames'], desc='Normalize images')]
@@ -122,6 +152,13 @@ if __name__ == "__main__":
     root.bind('<Left>', left_key)
     root.bind('<Right>', right_key)
     root.bind('<space>', save_key)
+
+    # Pressing the 'a' key marks the lowest frame number
+    # Pressing the 'd' key marks the highest frame number
+    root.bind('<a>', mark_low_frame)
+    root.bind('<d>', mark_high_frame)
+    root.bind('<s>', save_single_file)
+
     app.pack()
     canvas = tk.Label(app)
     canvas.pack()
