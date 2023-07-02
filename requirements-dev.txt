@@ -3,3 +3,6 @@ matplotlib
 pillow
 ipykernel
 pandas
+torch
+kornia
+einops
