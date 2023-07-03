@@ -1,0 +1,10 @@
+GL_UPPER_LIMIT = 2 ** 13
+GL_LOWER_LIMIT = 2 ** 11
+T_UPPER_LIMIT = 2 ** 13
+T_LOWER_LIMIT = 2 ** 10
+NORM_GL = lambda x: (x - GL_LOWER_LIMIT) / (GL_UPPER_LIMIT - GL_LOWER_LIMIT)
+DENORM_GL = lambda x: x * (GL_UPPER_LIMIT - GL_LOWER_LIMIT) + GL_LOWER_LIMIT
+NORM_T = lambda x: (x - T_LOWER_LIMIT) / (T_UPPER_LIMIT - T_LOWER_LIMIT)
+DENORM_T = lambda x: x * (T_UPPER_LIMIT - T_LOWER_LIMIT) + T_LOWER_LIMIT
+U100C2C = lambda x: x / 100  # [100C] to [C]
+C2U100C = lambda x: x * 100  # [C] to [100C]

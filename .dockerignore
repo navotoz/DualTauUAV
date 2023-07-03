@@ -8,3 +8,5 @@
 *.STEP
 *.STL
 *.stl
+**/rawData/
+*.npz

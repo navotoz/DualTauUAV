@@ -17,6 +17,8 @@ class HomographyResult:
     mask: Tensor = None
     homography: Tensor = None
     shift: Tensor = None
+    dynamic: Tensor = None
+    static: Tensor = None
 
     def __post_init__(self):
         if self.homography is None:
@@ -30,6 +32,8 @@ class HomographyResult:
         self.warped = self.warped.cpu() if isinstance(self.warped, Tensor) else self.warped
         self.mask = self.mask.cpu() if isinstance(self.mask, Tensor) else self.mask
         self.homography = self.homography.cpu() if isinstance(self.homography, Tensor) else self.homography
+        self.dynamic = self.dynamic.cpu() if isinstance(self.dynamic, Tensor) else self.dynamic
+        self.static = self.static.cpu() if isinstance(self.static, Tensor) else self.static
         self.shift = self.shift.cpu() if isinstance(self.shift, Tensor) else self.shift
         return self
 
@@ -134,4 +138,5 @@ class HomographySIFT(AbstractHomography):
 
     def forward(self, x: Tensor, m: Tensor, mask: Tensor, verbose: bool = True) -> HomographyResult:
         warped, mask, homography = self._model(x)
-        return HomographyResult(homography=homography, warped=warped[0], mask=mask[0], shift=None)
+        return HomographyResult(dynamic=x[:, 0], static=x[:, 1],
+                                homography=homography, warped=warped[0], mask=mask[0], shift=None)
