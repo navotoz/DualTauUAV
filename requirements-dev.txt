@@ -6,3 +6,5 @@ pandas
 torch
 kornia
 einops
+tqdm
+opencv-python
