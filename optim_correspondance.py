@@ -113,9 +113,9 @@ def optim_single_pts(*, path: Union[str, Path],
         pts_[..., i, j] += permutations_bounded_by_image
         pts_list = list(pts_)
         pts_list = [pd.DataFrame(p, columns=pts.columns, index=pts.index) for p in pts_list]
-        with Pool(cpu_count()) as p:
-            losses = list(p.imap(warper, pts_list))
-        # losses = list(tqdm(map(warper, pts_list), total=len(pts_list), desc=f'Optimize single points {i},{j}'))
+        # with Pool(cpu_count()) as p:
+        #     losses = list(p.imap(warper, pts_list))
+        losses = list(map(warper, pts_list))
         loss = min(losses)
         if loss < loss_best:
             pts_best = pts_list[np.argmin(losses)]
@@ -147,24 +147,27 @@ for path in tqdm(path_to_files.glob('points_*.csv'), desc='Remove all points fil
 for path in tqdm(path_to_files.glob('M_*.npy'), desc='Remove all homography files'):
     path.unlink()
 
-count_losses_below_threshold = 0
-with tqdm(total=len(list_of_files), desc=f'Optimize single points, loss threshold {LOSS_THRESHOLD:.2f}') as pbar:
-    for path in list_of_files:
-        idx_of_frame = int(path.stem.split('left_')[1])
-        if not (path_to_files / f'right_{idx_of_frame}.npy').exists():
-            raise FileNotFoundError(path_to_files / f'right_{idx_of_frame}.npy')
-        iteration_total, iteration_no_improvement = 0, 0
-        while True:
-            loss = optim_single_pts(
-                path=Path('rawData'),
-                n_pixels_for_single_points=DISTANCE_FROM_FRAME_EDGES,
-                idx_of_frame=idx_of_frame)
-            pbar.set_postfix_str(f'File: {idx_of_frame}, Saved {count_losses_below_threshold} homography matrices')
-            if loss >= loss_prev:
-                iteration_no_improvement += 1
-            if iteration_no_improvement > 1:
-                count_losses_below_threshold += (1 if loss < LOSS_THRESHOLD else 0)
-                break
-            loss_prev = loss
-            iteration_total += 1
-        pbar.update(1)
+
+def _run_mp_warp(path):
+    idx_of_frame = int(path.stem.split('left_')[1])
+    if not (path_to_files / f'right_{idx_of_frame}.npy').exists():
+        raise FileNotFoundError(path_to_files / f'right_{idx_of_frame}.npy')
+    iteration_no_improvement, loss_prev = 0, float('inf')
+    while True:
+        loss = optim_single_pts(
+            path=Path('rawData'),
+            n_pixels_for_single_points=DISTANCE_FROM_FRAME_EDGES,
+            idx_of_frame=idx_of_frame)
+        if loss >= loss_prev:
+            iteration_no_improvement += 1
+        if iteration_no_improvement > 1:
+            break
+        loss_prev = loss
+    return loss
+
+
+with Pool(cpu_count()) as pool:
+    ret_vals = list(tqdm(pool.imap(_run_mp_warp, list_of_files), total=len(list_of_files), desc='Optimizing points'))
+ret_vals = filter(lambda x: x is not None, ret_vals)
+ret_vals = list(filter(lambda x: x > LOSS_THRESHOLD, ret_vals))
+print(f'Number of frames with loss above threshold: {len(ret_vals)}')
