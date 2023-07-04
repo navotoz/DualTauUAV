@@ -1,6 +1,8 @@
 from pathlib import Path
 import csv
 
+import matplotlib
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 import numpy as np
 colors = ['red', 'green', 'blue', 'yellow']
@@ -46,7 +48,7 @@ def save_correspondence_points(points_left, points_right, save_path):
 
 
 if __name__ == '__main__':
-    idx = 25
+    idx = 0
 
     path = Path('rawData')
     save_path = path / f'points_{idx}.csv'
