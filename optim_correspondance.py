@@ -1,5 +1,4 @@
 from functools import partial
-from itertools import product
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Union
@@ -133,21 +132,6 @@ def optim_single_pts(*, path: Union[str, Path],
     return loss_best
 
 
-DISTANCE_FROM_FRAME_EDGES = 10
-LOSS_THRESHOLD = 0.5
-
-path_to_files = Path('rawData')
-loss_prev = float('inf')
-list_of_files = list(path_to_files.glob('left_*.npy'))
-list_of_files.sort(key=lambda x: int(x.stem.split('left_')[1]))
-
-# Remove all points files
-for path in tqdm(path_to_files.glob('points_*.csv'), desc='Remove all points files'):
-    path.unlink()
-for path in tqdm(path_to_files.glob('M_*.npy'), desc='Remove all homography files'):
-    path.unlink()
-
-
 def _run_mp_warp(path):
     idx_of_frame = int(path.stem.split('left_')[1])
     if not (path_to_files / f'right_{idx_of_frame}.npy').exists():
@@ -164,6 +148,21 @@ def _run_mp_warp(path):
             break
         loss_prev = loss
     return loss
+
+
+DISTANCE_FROM_FRAME_EDGES = 10
+LOSS_THRESHOLD = 0.5
+
+path_to_files = Path('rawData')
+loss_prev = float('inf')
+list_of_files = list(path_to_files.glob('left_*.npy'))
+list_of_files.sort(key=lambda x: int(x.stem.split('left_')[1]))
+
+# Remove all points files
+for path in tqdm(path_to_files.glob('points_*.csv'), desc='Remove all points files'):
+    path.unlink()
+for path in tqdm(path_to_files.glob('M_*.npy'), desc='Remove all homography files'):
+    path.unlink()
 
 
 with Pool(cpu_count()) as pool:

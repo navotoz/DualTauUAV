@@ -1,6 +1,8 @@
 import logging
 import threading as th
 
+import numpy as np
+
 
 class SyncFlag:
     def __init__(self, init_state: bool = True) -> None:
@@ -30,3 +32,23 @@ def make_logger(name) -> logging.Logger:
     # Add the stdout handler to the logger
     logger.addHandler(stdout_handler)
     return logger
+
+
+def load_files_from_dir(path):
+    data = {}
+    list_files = list(path.glob('*.npz'))
+    for p in list_files:
+        try:
+            d = np.load(p)
+        except:
+            continue
+        for k, v in d.items():
+            data.setdefault(k, []).extend(v)
+    if not data:
+        try:
+            data = np.load(path.with_suffix('.npz'))
+        except:
+            raise FileNotFoundError(f'No files found in {path}')
+    indices = np.argsort(data['time_ns'])
+    data = {k: np.stack(v)[indices] for k, v in data.items()}
+    return data
