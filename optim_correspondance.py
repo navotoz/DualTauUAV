@@ -134,7 +134,7 @@ def optim_single_pts(*, path: Union[str, Path],
 
 
 DISTANCE_FROM_FRAME_EDGES = 10
-LOSS_THRESHOLD = 0.55
+LOSS_THRESHOLD = 0.5
 
 path_to_files = Path('rawData')
 loss_prev = float('inf')
@@ -169,5 +169,5 @@ def _run_mp_warp(path):
 with Pool(cpu_count()) as pool:
     ret_vals = list(tqdm(pool.imap(_run_mp_warp, list_of_files), total=len(list_of_files), desc='Optimizing points'))
 ret_vals = filter(lambda x: x is not None, ret_vals)
-ret_vals = list(filter(lambda x: x > LOSS_THRESHOLD, ret_vals))
-print(f'Number of frames with loss above threshold: {len(ret_vals)}')
+ret_vals = list(filter(lambda x: x <= LOSS_THRESHOLD, ret_vals))
+print(f'Number of frames with loss bellow threshold: {len(ret_vals)}')
