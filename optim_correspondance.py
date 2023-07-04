@@ -128,12 +128,13 @@ def optim_single_pts(*, path: Union[str, Path],
             pts_best.astype(int).to_csv(path / f'points_{idx_of_frame}.csv', index=True)
             pts = pts_best
             loss_best = loss
-    if loss_best <= 0.7:  # an empiric threshold for saving the homography
+    if loss_best <= LOSS_THRESHOLD:  # an empiric threshold for saving the homography
         np.save(arr=get_M(pts=pts_best), file=path / f"M_{idx_of_frame}.npy")
     return loss_best
 
 
 DISTANCE_FROM_FRAME_EDGES = 10
+LOSS_THRESHOLD = 0.55
 
 path_to_files = Path('rawData')
 loss_prev = float('inf')
@@ -146,7 +147,8 @@ for path in tqdm(path_to_files.glob('points_*.csv'), desc='Remove all points fil
 for path in tqdm(path_to_files.glob('M_*.npy'), desc='Remove all homography files'):
     path.unlink()
 
-with tqdm(total=len(list_of_files), desc='Optimize single points') as pbar:
+count_losses_below_threshold = 0
+with tqdm(total=len(list_of_files), desc=f'Optimize single points, loss threshold {LOSS_THRESHOLD:.2f}') as pbar:
     for path in list_of_files:
         idx_of_frame = int(path.stem.split('left_')[1])
         if not (path_to_files / f'right_{idx_of_frame}.npy').exists():
@@ -157,10 +159,11 @@ with tqdm(total=len(list_of_files), desc='Optimize single points') as pbar:
                 path=Path('rawData'),
                 n_pixels_for_single_points=DISTANCE_FROM_FRAME_EDGES,
                 idx_of_frame=idx_of_frame)
-            pbar.set_postfix_str(f'File: {idx_of_frame}, Loss: {loss:.2f}, Iterations: {iteration_total}')
+            pbar.set_postfix_str(f'File: {idx_of_frame}, Saved {count_losses_below_threshold} homography matrices')
             if loss >= loss_prev:
                 iteration_no_improvement += 1
-            if iteration_no_improvement > 2:
+            if iteration_no_improvement > 1:
+                count_losses_below_threshold += (1 if loss < LOSS_THRESHOLD else 0)
                 break
             loss_prev = loss
             iteration_total += 1
