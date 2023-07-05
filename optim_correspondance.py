@@ -1,5 +1,4 @@
 from functools import partial
-from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Union
 import cv2
@@ -7,7 +6,6 @@ import numpy as np
 
 import pandas as pd
 import torch
-from tqdm import tqdm
 
 
 def load_pts(path_to_points):
@@ -67,7 +65,9 @@ def mp_warp(pts, dynamic, static):
 
 def optim_single_pts(*, path: Union[str, Path],
                      n_pixels_for_single_points: int = 0,
-                     idx_of_frame: int):
+                     idx_of_frame: int,
+                     distance_from_frame_edges: int,
+                     loss_threshold: float):
     dynamic = np.load(path / f"left_{idx_of_frame}.npy")
     static = np.load(path / f"right_{idx_of_frame}.npy")
     pts, colors = load_pts(path_to_points=path / f'points_{idx_of_frame}.csv')
@@ -77,10 +77,10 @@ def optim_single_pts(*, path: Union[str, Path],
         # The points are in the format [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
         pts = pd.DataFrame(
             np.array(
-                [[DISTANCE_FROM_FRAME_EDGES, DISTANCE_FROM_FRAME_EDGES],
-                 [DISTANCE_FROM_FRAME_EDGES, dynamic.shape[0] - DISTANCE_FROM_FRAME_EDGES],
-                 [dynamic.shape[1] - DISTANCE_FROM_FRAME_EDGES, DISTANCE_FROM_FRAME_EDGES],
-                 [dynamic.shape[1] - DISTANCE_FROM_FRAME_EDGES, dynamic.shape[0] - DISTANCE_FROM_FRAME_EDGES]]),
+                [[distance_from_frame_edges, distance_from_frame_edges],
+                 [distance_from_frame_edges, dynamic.shape[0] - distance_from_frame_edges],
+                 [dynamic.shape[1] - distance_from_frame_edges, distance_from_frame_edges],
+                 [dynamic.shape[1] - distance_from_frame_edges, dynamic.shape[0] - distance_from_frame_edges]]),
             columns=['STATIC_X', 'STATIC_Y'])
         pts['DYN_X'] = pts['STATIC_X']
         pts['DYN_Y'] = pts['STATIC_Y']
@@ -127,46 +127,27 @@ def optim_single_pts(*, path: Union[str, Path],
             pts_best.astype(int).to_csv(path / f'points_{idx_of_frame}.csv', index=True)
             pts = pts_best
             loss_best = loss
-    if loss_best <= LOSS_THRESHOLD:  # an empiric threshold for saving the homography
+    if loss_best <= loss_threshold:  # an empiric threshold for saving the homography
         np.save(arr=get_M(pts=pts_best), file=path / f"M_{idx_of_frame}.npy")
     return loss_best
 
 
-def _run_mp_warp(path):
-    idx_of_frame = int(path.stem.split('left_')[1])
-    if not (path_to_files / f'right_{idx_of_frame}.npy').exists():
-        raise FileNotFoundError(path_to_files / f'right_{idx_of_frame}.npy')
+def mp_optimize_homography(index_of_frame, distance_from_frame_edges: int, loss_threshold: float,
+                           path_to_files: Union[str, Path]):
+    path_to_files = Path(path_to_files)
+    if not (path_to_files / f'right_{index_of_frame}.npy').exists():
+        raise FileNotFoundError(path_to_files / f'right_{index_of_frame}.npy')
     iteration_no_improvement, loss_prev = 0, float('inf')
     while True:
         loss = optim_single_pts(
-            path=Path('rawData'),
-            n_pixels_for_single_points=DISTANCE_FROM_FRAME_EDGES,
-            idx_of_frame=idx_of_frame)
+            path=path_to_files,
+            n_pixels_for_single_points=distance_from_frame_edges,
+            idx_of_frame=index_of_frame,
+            loss_threshold=loss_threshold,
+            distance_from_frame_edges=distance_from_frame_edges)
         if loss >= loss_prev:
             iteration_no_improvement += 1
         if iteration_no_improvement > 1:
             break
         loss_prev = loss
     return loss
-
-
-DISTANCE_FROM_FRAME_EDGES = 10
-LOSS_THRESHOLD = 0.5
-
-path_to_files = Path('rawData')
-loss_prev = float('inf')
-list_of_files = list(path_to_files.glob('left_*.npy'))
-list_of_files.sort(key=lambda x: int(x.stem.split('left_')[1]))
-
-# Remove all points files
-for path in tqdm(path_to_files.glob('points_*.csv'), desc='Remove all points files'):
-    path.unlink()
-for path in tqdm(path_to_files.glob('M_*.npy'), desc='Remove all homography files'):
-    path.unlink()
-
-
-with Pool(cpu_count()) as pool:
-    ret_vals = list(tqdm(pool.imap(_run_mp_warp, list_of_files), total=len(list_of_files), desc='Optimizing points'))
-ret_vals = filter(lambda x: x is not None, ret_vals)
-ret_vals = list(filter(lambda x: x <= LOSS_THRESHOLD, ret_vals))
-print(f'Number of frames with loss bellow threshold: {len(ret_vals)}')
