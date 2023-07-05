@@ -8,6 +8,17 @@ import pandas as pd
 import torch
 
 
+def create_permutations(vector):
+    N = len(vector)
+    permutations = np.empty((N*N, 2), dtype=int)
+    index = 0
+    for i in range(N):
+        for j in range(N):
+            permutations[index] = (vector[i], vector[j])
+            index += 1
+    return permutations
+
+
 def load_pts(path_to_points):
     try:
         pts = pd.read_csv(path_to_points)
@@ -93,27 +104,29 @@ def optim_single_pts(*, path: Union[str, Path],
     pts_best = pts.copy()
 
     # Optimize all points as single points first
+    # Optimize only the dynamic points
     warper = partial(mp_warp, dynamic=dynamic, static=static)
     permutations = np.arange(- n_pixels_for_single_points, n_pixels_for_single_points+1)
+    permutations = create_permutations(permutations)
+    number_of_pts = pts.shape[0]
 
-    # Optimize only the dynamic points
-    shape_of_pts_dynamic = pts[['DYN_X', 'DYN_Y']].shape
+    for idx_pt in range(number_of_pts):
+        x_pt = pts.iloc[idx_pt].loc['DYN_X']
+        y_pt = pts.iloc[idx_pt].loc['DYN_Y']
+        permutations_ = permutations.copy()
+        # Remove permutations outside the frame
+        mask = (x_pt + permutations_ >= 0) & (x_pt + permutations_ < dynamic.shape[1])
+        mask = mask[:, 0]
+        permutations_ = permutations_[mask]
+        mask = (y_pt + permutations_ >= 0) & (y_pt + permutations_ < dynamic.shape[0])
+        mask = mask[:, 1]
+        permutations_ = permutations_[mask]
 
-    for i, j in np.ndindex(shape_of_pts_dynamic):
-        value_of_point = pts.iloc[i, j]
-        dim_of_point = pts.columns[j]
-        if 'x' in dim_of_point.lower():
-            dim_of_point = 1
-        elif 'y' in dim_of_point.lower():
-            dim_of_point = 0
-        permutations_bounded_by_image = permutations[(value_of_point + permutations >= 0) &
-                                                     (value_of_point + permutations < dynamic.shape[dim_of_point])]
-        pts_ = pts.copy().values[None, ...].repeat(len(permutations_bounded_by_image), 0)
-        pts_[..., i, j] += permutations_bounded_by_image
+        pts_ = pts.copy().values[None, ...]
+        pts_ = np.repeat(pts_, len(permutations_), axis=0)
+        pts_[..., idx_pt, :2] += permutations_  # add permutations to the dynamic points
         pts_list = list(pts_)
         pts_list = [pd.DataFrame(p, columns=pts.columns, index=pts.index) for p in pts_list]
-        # with Pool(cpu_count()) as p:
-        #     losses = list(p.imap(warper, pts_list))
         losses = list(map(warper, pts_list))
         loss = min(losses)
         if loss < loss_best:
