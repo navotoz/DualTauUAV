@@ -29,24 +29,25 @@ def load_pts(path_to_points):
     return pts, colors
 
 
-def find_diff(*, warped, mask, static):
-    diff = np.abs(warped[mask].astype(float)-static[mask].astype(float))
+def find_diff(*, warped, mask, dest):
+    diff = np.abs(warped[mask].astype(float)-dest[mask].astype(float))
     return diff.mean()
 
 
 def get_M(pts):
-    return cv2.getPerspectiveTransform(pts[['STATIC_X', 'STATIC_Y']].values, pts[['DYN_X', 'DYN_Y']].values)
+    return cv2.getPerspectiveTransform(src=pts[['DEST_X', 'DEST_Y']].values,
+                                       dst=pts[['SRC_X', 'SRC_Y']].values,)
 
 
-def warp(*, pts: Union[str, Path], dynamic, static):
-    if isinstance(dynamic, torch.Tensor):
-        dynamic = dynamic.detach().cpu().numpy().squeeze()
-    if isinstance(static, torch.Tensor):
-        static = static.detach().cpu().numpy().squeeze()
+def warp(*, pts: Union[str, Path], src, dest):
+    if isinstance(src, torch.Tensor):
+        src = src.detach().cpu().numpy().squeeze()
+    if isinstance(dest, torch.Tensor):
+        dest = dest.detach().cpu().numpy().squeeze()
 
     M = get_M(pts)
-    dst = cv2.warpPerspective(dynamic, M, list(reversed(static.shape[-2:])))
-    mask = cv2.warpPerspective(np.ones_like(dynamic), M, list(reversed(static.shape[-2:])),
+    dst = cv2.warpPerspective(src, M, list(reversed(dest.shape[-2:])))
+    mask = cv2.warpPerspective(np.ones_like(src), M, list(reversed(dest.shape[-2:])),
                                borderMode=cv2.BORDER_CONSTANT, borderValue=0, flags=cv2.INTER_NEAREST).astype(bool)
 
     # Erode mask
@@ -59,9 +60,11 @@ def warp(*, pts: Union[str, Path], dynamic, static):
     return dst, mask
 
 
-def mp_warp(pts, dynamic, static):
-    warped, mask = warp(pts=pts, dynamic=dynamic, static=static)
-    return find_diff(warped=warped, mask=mask, static=static)
+def mp_warp(pts, src, dest):
+    warped, mask = warp(pts=pts, src=src, dest=dest)
+    if not mask.any():
+        return np.inf
+    return find_diff(warped=warped, mask=mask, dest=dest)
 
 
 def optim_single_pts(*, path: Union[str, Path],
@@ -69,8 +72,8 @@ def optim_single_pts(*, path: Union[str, Path],
                      idx_of_frame: int,
                      distance_from_frame_edges: int,
                      loss_threshold: float):
-    dynamic = np.load(path / f"src_{idx_of_frame}.npy")
-    static = np.load(path / f"dest_{idx_of_frame}.npy")
+    src = np.load(path / f"src_{idx_of_frame}.npy")
+    dest = np.load(path / f"dest_{idx_of_frame}.npy")
     pts, colors = load_pts(path_to_points=path / f'points_{idx_of_frame}.csv')
     if not isinstance(pts, pd.DataFrame):
         # Create a pandas dataframe with 4 points:
@@ -79,36 +82,36 @@ def optim_single_pts(*, path: Union[str, Path],
         pts = pd.DataFrame(
             np.array(
                 [[distance_from_frame_edges, distance_from_frame_edges],
-                 [distance_from_frame_edges, dynamic.shape[0] - distance_from_frame_edges],
-                 [dynamic.shape[1] - distance_from_frame_edges, distance_from_frame_edges],
-                 [dynamic.shape[1] - distance_from_frame_edges, dynamic.shape[0] - distance_from_frame_edges]]),
-            columns=['STATIC_X', 'STATIC_Y'])
-        pts['DYN_X'] = pts['STATIC_X']
-        pts['DYN_Y'] = pts['STATIC_Y']
+                 [distance_from_frame_edges, src.shape[0] - distance_from_frame_edges],
+                 [src.shape[1] - distance_from_frame_edges, distance_from_frame_edges],
+                 [src.shape[1] - distance_from_frame_edges, src.shape[0] - distance_from_frame_edges]]),
+            columns=['DEST_X', 'DEST_Y'])
+        pts['SRC_X'] = pts['DEST_X']
+        pts['SRC_Y'] = pts['DEST_Y']
         pts = pts.astype(np.float32)
         colors = ['red', 'green', 'blue', 'yellow']
 
     # Calculate initial loss
-    loss_init = mp_warp(dynamic=dynamic, static=static, pts=pts)
+    loss_init = mp_warp(src=src, dest=dest, pts=pts)
     loss_best = loss_init
     pts_best = pts.copy()
 
     # Optimize all points as single points first
     # Optimize only the dynamic points
-    warper = partial(mp_warp, dynamic=dynamic, static=static)
+    warper = partial(mp_warp, src=src, dest=dest)
     permutations = np.arange(- n_pixels_for_single_points, n_pixels_for_single_points+1)
     permutations = create_permutations(permutations)
     number_of_pts = pts.shape[0]
 
     for idx_pt in range(number_of_pts):
-        x_pt = pts.iloc[idx_pt].loc['DYN_X']
-        y_pt = pts.iloc[idx_pt].loc['DYN_Y']
+        x_pt = pts.iloc[idx_pt].loc['SRC_X']
+        y_pt = pts.iloc[idx_pt].loc['SRC_Y']
         permutations_ = permutations.copy()
         # Remove permutations outside the frame
-        mask = (x_pt + permutations_ >= 0) & (x_pt + permutations_ < dynamic.shape[1])
+        mask = (x_pt + permutations_ >= 0) & (x_pt + permutations_ < src.shape[1])
         mask = mask[:, 0]
         permutations_ = permutations_[mask]
-        mask = (y_pt + permutations_ >= 0) & (y_pt + permutations_ < dynamic.shape[0])
+        mask = (y_pt + permutations_ >= 0) & (y_pt + permutations_ < src.shape[0])
         mask = mask[:, 1]
         permutations_ = permutations_[mask]
 

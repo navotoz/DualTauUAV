@@ -42,7 +42,7 @@ def select_correspondence_points(left_image, right_image):
 def save_correspondence_points(points_left, points_right, save_path):
     with open(save_path, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Colors', 'DYN_X', 'DYN_Y', 'STATIC_X', 'STATIC_Y'])
+        writer.writerow(['Colors', 'SRC_X', 'SRC_Y', 'DEST_X', 'DEST_Y'])
         for i, ((x_left, y_left), (x_right, y_right)) in enumerate(zip(points_left, points_right)):
             writer.writerow([colors[i], x_left, y_left, x_right, y_right])
 
