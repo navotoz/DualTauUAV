@@ -99,7 +99,7 @@ def optim_single_pts(*, path: Union[str, Path],
     # Optimize all points as single points first
     # Optimize only the dynamic points
     warper = partial(mp_warp, src=src, dest=dest)
-    permutations = np.arange(- n_pixels_for_single_points, n_pixels_for_single_points+1)
+    permutations = np.arange(-n_pixels_for_single_points, n_pixels_for_single_points+1)
     permutations = create_permutations(permutations)
     number_of_pts = pts.shape[0]
 
@@ -145,7 +145,7 @@ def mp_optimize_homography(index_of_frame, distance_from_frame_edges: int, loss_
     if not (path_to_files / f'dest_{index_of_frame}.npy').exists():
         raise FileNotFoundError(path_to_files / f'dest_{index_of_frame}.npy')
     iteration_no_improvement, loss_prev = 0, float('inf')
-    while True:
+    for _ in range(30):
         loss = optim_single_pts(
             path=path_to_files,
             n_pixels_for_single_points=distance_from_frame_edges,
