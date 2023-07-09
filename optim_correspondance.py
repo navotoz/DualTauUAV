@@ -35,12 +35,8 @@ def mask_to_nans(image, mask) -> np.ndarray:
     return d
 
 
-def find_diff(*, warped, mask, static):
-    d = mask_to_nans(image=warped, mask=~mask)
-    s = mask_to_nans(image=static, mask=~mask)
-    diff = np.abs(s-d)
-    diff /= 100  # 100C to C
-    return diff[~np.isnan(diff)].mean(), diff
+def find_diff(*, warped, static):
+    return np.nanmean(np.abs(warped-static))
 
 
 def get_M(pts):
@@ -59,8 +55,7 @@ def warp(*, pts: Union[str, Path], dynamic, static):
                                borderMode=cv2.BORDER_CONSTANT, borderValue=0, flags=cv2.INTER_NEAREST).astype(bool)
 
     # Erode mask
-    kernel = np.eye(3, dtype=np.uint8)
-    mask = cv2.erode(mask.astype(np.uint8), kernel, iterations=1).astype(bool)
+    mask = cv2.erode(mask.astype(np.uint8), kernel=None, iterations=2).astype(bool)
 
     # # mask negative values in gt
     # mask = mask | (gt < 0) | (gt > 100)
@@ -71,7 +66,7 @@ def warp(*, pts: Union[str, Path], dynamic, static):
 
 def mp_warp(pts, dynamic, static):
     warped, mask = warp(pts=pts, dynamic=dynamic, static=static)
-    return find_diff(warped=warped, mask=mask, static=static)[0]
+    return find_diff(warped=warped, static=static)
 
 
 def optim_single_pts(*, path: Union[str, Path],
@@ -79,8 +74,8 @@ def optim_single_pts(*, path: Union[str, Path],
                      idx_of_frame: int,
                      distance_from_frame_edges: int,
                      loss_threshold: float):
-    dynamic = np.load(path / f"left_{idx_of_frame}.npy")
-    static = np.load(path / f"right_{idx_of_frame}.npy")
+    dynamic = np.load(path / f"src_{idx_of_frame}.npy")
+    static = np.load(path / f"dest_{idx_of_frame}.npy")
     pts, colors = load_pts(path_to_points=path / f'points_{idx_of_frame}.csv')
     if not isinstance(pts, pd.DataFrame):
         # Create a pandas dataframe with 4 points:
@@ -148,8 +143,8 @@ def optim_single_pts(*, path: Union[str, Path],
 def mp_optimize_homography(index_of_frame, distance_from_frame_edges: int, loss_threshold: float,
                            path_to_files: Union[str, Path]):
     path_to_files = Path(path_to_files)
-    if not (path_to_files / f'right_{index_of_frame}.npy').exists():
-        raise FileNotFoundError(path_to_files / f'right_{index_of_frame}.npy')
+    if not (path_to_files / f'dest_{index_of_frame}.npy').exists():
+        raise FileNotFoundError(path_to_files / f'dest_{index_of_frame}.npy')
     iteration_no_improvement, loss_prev = 0, float('inf')
     while True:
         loss = optim_single_pts(

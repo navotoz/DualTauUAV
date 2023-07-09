@@ -53,8 +53,8 @@ if __name__ == '__main__':
     path = Path('rawData')
     save_path = path / f'points_{idx}.csv'
 
-    left_img = np.load(path / f'left_{idx}.npy')
-    right_img = np.load(path / f'right_{idx}.npy')
+    left_img = np.load(path / f'src_{idx}.npy')
+    right_img = np.load(path / f'dest_{idx}.npy')
 
     points_left, points_right = select_correspondence_points(left_img, right_img)
     save_correspondence_points(points_left, points_right, save_path)
