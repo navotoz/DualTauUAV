@@ -29,14 +29,9 @@ def load_pts(path_to_points):
     return pts, colors
 
 
-def mask_to_nans(image, mask) -> np.ndarray:
-    d = image.copy().astype(float)
-    d[mask] = np.nan
-    return d
-
-
-def find_diff(*, warped, static):
-    return np.nanmean(np.abs(warped-static))
+def find_diff(*, warped, mask, static):
+    diff = np.abs(warped[mask].astype(float)-static[mask].astype(float))
+    return diff.mean()
 
 
 def get_M(pts):
@@ -55,7 +50,7 @@ def warp(*, pts: Union[str, Path], dynamic, static):
                                borderMode=cv2.BORDER_CONSTANT, borderValue=0, flags=cv2.INTER_NEAREST).astype(bool)
 
     # Erode mask
-    mask = cv2.erode(mask.astype(np.uint8), kernel=None, iterations=2).astype(bool)
+    mask = cv2.erode(mask.astype(np.uint8), kernel=None, iterations=1).astype(bool)
 
     # # mask negative values in gt
     # mask = mask | (gt < 0) | (gt > 100)
@@ -66,7 +61,7 @@ def warp(*, pts: Union[str, Path], dynamic, static):
 
 def mp_warp(pts, dynamic, static):
     warped, mask = warp(pts=pts, dynamic=dynamic, static=static)
-    return find_diff(warped=warped, static=static)
+    return find_diff(warped=warped, mask=mask, static=static)
 
 
 def optim_single_pts(*, path: Union[str, Path],
@@ -135,6 +130,7 @@ def optim_single_pts(*, path: Union[str, Path],
             pts_best.astype(int).to_csv(path / f'points_{idx_of_frame}.csv', index=True)
             pts = pts_best
             loss_best = loss
+
     if loss_best <= loss_threshold:  # an empiric threshold for saving the homography
         np.save(arr=get_M(pts=pts_best), file=path / f"M_{idx_of_frame}.npy")
     return loss_best
