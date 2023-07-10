@@ -64,16 +64,12 @@ def fix_timing_between_left_and_right(*,
             src = {k: v[indices_of_longer_dict] for k, v in src.items()}
         else:
             dest = {k: v[indices_of_longer_dict] for k, v in dest.items()}
-    print(f"Length of left: {len(src['time_ns']):,}")
-    print(f"Length of right: {len(dest['time_ns']):,}")
 
     # Sort both arrays to have the closest timestamps have same index
     diff = np.argmin(np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :]), axis=0)
     src = {k: v[diff] for k, v in src.items()}
 
     diff = np.abs(src['time_ns'] - dest['time_ns'])*1e-9
-    print(f"Max time difference between frames: {np.max(diff):.2g} seconds")
-    print(f"Min time difference between frames: {np.min(diff):.2g} seconds")
 
     plt.figure()
     plt.scatter(range(len(src['time_ns'])), src['time_ns'] * 1e-9, label='Left', s=2)
@@ -90,6 +86,11 @@ def fix_timing_between_left_and_right(*,
     plt.title('Time difference between frames')
     plt.ylabel('Time difference [s]')
     plt.show()
+
+    print(f"Length of left: {len(src['time_ns']):,}")
+    print(f"Length of right: {len(dest['time_ns']):,}")
+    print(f"Max time difference between frames: {np.max(diff):.2g} seconds")
+    print(f"Min time difference between frames: {np.min(diff):.2g} seconds")
     return src, dest
 
 
