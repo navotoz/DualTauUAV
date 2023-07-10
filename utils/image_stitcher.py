@@ -168,17 +168,19 @@ class ImageStitcher(nn.Module):
 
     def stitch_pair(
             self,
-            images_left: torch.Tensor,
-            images_right: torch.Tensor,
+            images_src: torch.Tensor,
+            images_dest: torch.Tensor,
             mask_left: Optional[torch.Tensor] = None,
             mask_right: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # Compute the transformed images
-        input_dict: Dict[str, torch.Tensor] = self.preprocess(images_left, images_right)
+        input_dict: Dict[str, torch.Tensor] = self.preprocess(images_src, images_dest)
         # out_shape: Tuple[int, int] = (images_left.shape[-2], images_left.shape[-1] + images_right.shape[-1])
         correspondences: dict = self.on_matcher(input_dict)
-        homo: torch.Tensor = self.estimate_transform(**correspondences)
-        src_img = warp_perspective(images_right, homo, images_right.shape[-2:], align_corners=True, mode='bicubic')
+        h: torch.Tensor = self.estimate_transform(**correspondences)
+        h = torch.inverse(h)  # the homography from src to dest
+
+        src_img = warp_perspective(images_dest, h, images_dest.shape[-2:], align_corners=True, mode='bicubic')
         # dst_img = torch.cat([images_left, torch.zeros_like(images_right)], dim=-1)
 
         # Compute the transformed masks
@@ -187,10 +189,10 @@ class ImageStitcher(nn.Module):
         # if mask_right is None:
         #     mask_right = torch.ones_like(images_right)
         # 'nearest' to ensure no floating points in the mask
-        src_mask = warp_perspective(torch.ones_like(images_right), homo, images_right.shape[-2:], mode='nearest')
+        src_mask = warp_perspective(torch.ones_like(images_dest), h, images_dest.shape[-2:], mode='nearest')
         # src_mask = warp_perspective(mask_right, homo, out_shape, mode='nearest')
         # dst_mask = torch.cat([mask_left, torch.zeros_like(mask_right)], dim=-1)
-        return src_img, src_mask, homo
+        return src_img, src_mask, h
 
     def forward(self, imgs: torch.Tensor) -> torch.Tensor:
         return self.stitch_pair(imgs[:, [0]], imgs[:, [1]])

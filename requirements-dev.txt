@@ -8,3 +8,4 @@ kornia
 einops
 tqdm
 opencv-python
+scipy
