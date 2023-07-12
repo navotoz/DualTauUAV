@@ -67,3 +67,11 @@ Bit	Hex Value	Meaning
 19	8000	Soft temperature limit has occurred
 
 https://pimylifeup.com/raspberry-pi-low-voltage-warning/
+
+
+# Testing the Hardware trigger
+![](rpi_gpio_real.png)
+![](rpi_gpio_scheme.png)
+1. Connection:
+   - Trigger 7 -> GPIO 9, AKA Pin 9  (GND)
+   - Trigger 5 -> GPIO 17, AKA Pin 11 (Trigger)
