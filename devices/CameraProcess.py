@@ -133,11 +133,15 @@ class CameraCtrl(mp.Process):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
+        self._barrier_camera_sync.wait(timeout=None)  # sync the initialization of both cameras
         self._time_start = time_ns()
         while True:
             try:
                 with self._lock_camera:
-                    self._barrier_camera_sync.wait(timeout=0.05)  # timeout set to 20Hz
+                    try:
+                        self._barrier_camera_sync.wait(timeout=0.05)  # timeout set to 20Hz
+                    except RuntimeError:
+                        pass
                     frame = self._camera.grab() if self._camera is not None else None
                     time_frame = time_ns()
             except Exception as e:
