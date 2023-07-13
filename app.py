@@ -1,10 +1,8 @@
 from pathlib import Path
 import shutil
-from time import sleep
 from uuid import uuid4
 from flask import Flask, render_template
 import threading as th
-import RPi.GPIO as GPIO
 from thread_devices import ThreadDevices, NAME_DEVICES_THREAD
 
 app = Flask(__name__)
@@ -47,7 +45,4 @@ def index():
 
 
 if __name__ == '__main__':
-    try:
-        app.run(debug=False, host='0.0.0.0', port=8080)
-    except Exception:
-        GPIO.cleanup()
+    app.run(debug=False, host='0.0.0.0', port=8080)
