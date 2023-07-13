@@ -21,10 +21,13 @@ class CameraCtrl(mp.Process):
     _workers_dict = {}
     _camera: Tau2 = None
 
-    def __init__(self, path_to_save: Union[str, Path], name: str = '', time_to_save: int = 10e9,
+    def __init__(self, path_to_save: Union[str, Path],
+                 barrier_camera_sync: mp.Condition,
+                 name: str = '', time_to_save: int = 10e9,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
+        self._barrier_camera_sync = barrier_camera_sync
 
         self._path_to_save = Path(path_to_save)
         if not self._path_to_save.is_dir():
@@ -134,6 +137,7 @@ class CameraCtrl(mp.Process):
         while True:
             try:
                 with self._lock_camera:
+                    self._barrier_camera_sync.wait()
                     frame = self._camera.grab() if self._camera is not None else None
                     time_frame = time_ns()
             except Exception as e:
@@ -191,6 +195,10 @@ class CameraCtrl(mp.Process):
                      time_ns=np.stack(data['time_ns']))
             self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1
+            
+            # Zeroize the rate
+            self._n_frames = 0 
+            self._time_start = time_ns()
 
     @property
     def n_files_saved(self) -> int:

@@ -1,6 +1,7 @@
 from functools import partial
 import threading as th
 from time import sleep
+import multiprocessing as mp
 
 from devices import INIT_CAMERA_PARAMETERS, EnumParameterPosition
 from devices.CameraProcess import CameraCtrl
@@ -18,7 +19,12 @@ class ThreadDevices(th.Thread):
         params['ffc_mode'] = 'auto'
         params['ffc_period'] = 3600  # ffc every one minute
 
+        # Init cameras
+        # Cams are synced by the barrier, which releases all cams simultaniously when N_CAMERAS acquire it.
+        N_CAMERAS = 2
+        self._barrier_camera_sync = mp.Barrier(parties=N_CAMERAS) 
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
+                           barrier_camera_sync=self._barrier_camera_sync,
                            time_to_save=5e9)  # dump to disk every 5 seconds
         self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')

@@ -46,35 +46,6 @@ def index():
         mono_files=thread_devices.n_files_mono)
 
 
-# The sampling rate of the cameras
-FREQUENCY_CAMERAS = 10  # Hz
-DUTY_CYCLE = 0.01
-period = 1 / FREQUENCY_CAMERAS
-low_time = period * DUTY_CYCLE  # seconds
-high_time = period - low_time  # seconds
-
-# Define a function to toggle the trigger signal at the given rate
-def th_rpi_trigger_for_cam():
-    global FREQUENCY_CAMERAS
-    while True:
-        # Set the trigger pin to high
-        GPIO.output(PIN_TRIGGER, GPIO.HIGH)
-        # Wait for half the period
-        sleep(low_time)
-        # Set the trigger pin to low
-        GPIO.output(PIN_TRIGGER, GPIO.LOW)
-        # Wait for the other half of the period
-        sleep(high_time)
-
-
-# Initialize the GPIO pin for the trigger signal
-PIN_TRIGGER = 17
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(PIN_TRIGGER, GPIO.OUT)
-trigger_thread = th.Thread(target=th_rpi_trigger_for_cam, daemon=True)
-trigger_thread.start()
-
-
 if __name__ == '__main__':
     try:
         app.run(debug=False, host='0.0.0.0', port=8080)

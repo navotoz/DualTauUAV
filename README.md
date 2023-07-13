@@ -76,17 +76,18 @@ https://pimylifeup.com/raspberry-pi-low-voltage-warning/
 Connection:
    - Yellow with orange strip (5 in the JST) -> GND, AKA Pin 9
    - Blue with orange strip (7 in the JST) -> GPIO 17, AKA Pin 11
+   - Blue strip (6 in the JST) -> GPIO 27, AKA Pin 13
 
 
 
 ### Pinout of cable Lavi made (see schematic of Teax grabber for Pinout of JST cable)
-1 - Red
-2 - Green with tape
-3 - Green
-4 - Yellow
-5 - Yellow with orange strip
-6 - Blue
-7 - Blue with orange strip
+1. Red
+2. Green with tape
+3. Green
+4. Yellow
+5. Yellow with orange strip
+6. Blue
+7. Blue with orange strip
 
 ### ThermalCapture GrabberUSB
 ![](devices/ImageTeaxGrabber2.png)

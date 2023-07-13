@@ -18,6 +18,8 @@ on_time = period * duty_cycle  # seconds
 off_time = period - on_time  # seconds
 cam1_deque = deque(maxlen=N)
 cam2_deque = deque(maxlen=N)
+time_start = time.time_ns()
+count_sync = 0
 
 
 # Define a function to toggle the trigger signal at the given rate
@@ -36,6 +38,8 @@ def trigger_loop():
 
 # Define a function to sample frames from a camera and append the timestamps to a deque
 def camera_loop(cam: Tau2, cam_deque: deque):
+    global time_start
+    time_start = time.time_ns()
     while True:
         # Try to get a frame from the camera
         # If the frame is not None, append the current time to the deque
@@ -74,6 +78,15 @@ def set_duty_cycle(value):
     cam2_deque.clear()
 
 
+# Function to be called when a sync toggle is detected
+def sync_toggle(channel):
+    global previous_state, count_sync
+    current_state = GPIO.input(channel)
+    if current_state != previous_state:
+        count_sync += 1
+        previous_state = current_state
+
+
 # Init cameras
 class Dummy:
     def __init__(self, name) -> None:
@@ -89,8 +102,14 @@ camera_2 = Tau2(name='2')
 
 # Initialize the GPIO pin for the trigger signal
 PIN_TRIGGER = 17
+PIN_SYNC = 27
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(PIN_TRIGGER, GPIO.OUT)
+GPIO.setup(PIN_SYNC, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+previous_state = GPIO.input(PIN_SYNC)
+
+# Add event detection for falling and rising edges on the sync pin
+GPIO.add_event_detect(PIN_SYNC, GPIO.BOTH, callback=sync_toggle)
 
 # Get the trigger rate from the user
 trigger_rate = float(input("Enter the trigger rate: "))
@@ -108,7 +127,8 @@ cam2_thread.start()
 # Update the progress bar based on the trigger rate
 try:
     while True:
-        print(f"Cam 1: {get_rate(cam_deque=cam1_deque):.0f}Hz, Cam 2: {get_rate(cam_deque=cam2_deque):.0f}Hz | "
+        print(f"Cam 1: {get_rate(cam_deque=cam1_deque):.1f}Hz, Cam 2: {get_rate(cam_deque=cam2_deque):.1f}Hz, "
+              f"Sync {1e9 * count_sync / (time.time_ns() - time_start):.1f} | "
               f"Freq: {trigger_freq:.0f}, Duty cycle: {duty_cycle:.1f}")
         time.sleep(1)
 except Exception as e:
