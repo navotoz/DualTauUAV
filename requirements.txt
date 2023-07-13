@@ -5,3 +5,5 @@ flask
 gunicorn
 pyyaml
 pyftdi  # Tau2
+
+RPi.GPIO==0.7.1

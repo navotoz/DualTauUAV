@@ -70,8 +70,24 @@ https://pimylifeup.com/raspberry-pi-low-voltage-warning/
 
 
 # Testing the Hardware trigger
-![](rpi_gpio_real.png)
-![](rpi_gpio_scheme.png)
-1. Connection:
-   - Trigger 7 -> GPIO 9, AKA Pin 9  (GND)
-   - Trigger 5 -> GPIO 17, AKA Pin 11 (Trigger)
+### Noitce - use testing program (test_hardware_trigger.py)
+![](devices/rpi_gpio_real.png)
+![](devices/rpi_gpio_scheme.png)
+Connection:
+   - Yellow with orange strip (5 in the JST) -> GND, AKA Pin 9
+   - Blue with orange strip (7 in the JST) -> GPIO 17, AKA Pin 11
+
+
+
+### Pinout of cable Lavi made (see schematic of Teax grabber for Pinout of JST cable)
+1 - Red
+2 - Green with tape
+3 - Green
+4 - Yellow
+5 - Yellow with orange strip
+6 - Blue
+7 - Blue with orange strip
+
+### ThermalCapture GrabberUSB
+![](devices/ImageTeaxGrabber2.png)
+![](devices/PinoutTeaxGrabber2.png)
