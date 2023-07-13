@@ -38,9 +38,9 @@ def load_src_and_dest(path_to_files):
 
 def _get_diff(src, dest):
     if len(src['time_ns']) > len(dest['time_ns']):
-        return np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :])
+        return 'src', np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :])
     else:
-        return np.abs(src['time_ns'][None, :] - dest['time_ns'][:, None])
+        return 'dest', np.abs(src['time_ns'][None, :] - dest['time_ns'][:, None])
 
 
 def fix_timing_between_left_and_right(*,
@@ -51,46 +51,48 @@ def fix_timing_between_left_and_right(*,
     dest = deepcopy(dest)
     max_time_diff_ns = max_time_diff * 1e9
 
-    # Remove frames that are not in both cameras
-    while abs(len(src['time_ns']) - len(dest['time_ns'])) > 1:
-        # Find the difference between the timestamps of the two cameras
-        diff = _get_diff(src, dest)
+    # Align the two arrays
+    which_is_longer, diff = _get_diff(src, dest)
+    diff = diff.argmin(axis=0)
+    if which_is_longer == 'src':
+        src = {k: v[diff] for k, v in src.items()}
+    elif which_is_longer == 'dest':
+        dest = {k: v[diff] for k, v in dest.items()}
 
-        # Find the indices in the longer array that have no counterpart in the shorter array
-        diff_values_of_longer_dict = np.min(diff, axis=1)
-        mask_longer_dict = diff_values_of_longer_dict <= max_time_diff_ns
-        indices_of_longer_dict = np.where(mask_longer_dict)[0]
-        if len(src['time_ns']) > len(dest['time_ns']):
-            src = {k: v[indices_of_longer_dict] for k, v in src.items()}
-        else:
-            dest = {k: v[indices_of_longer_dict] for k, v in dest.items()}
+    # Filter out frames that are too far apart
+    diff = _get_diff(src, dest)[1].diagonal()
+    mask = diff <= max_time_diff_ns
+    src = {k: v[mask] for k, v in src.items()}
+    dest = {k: v[mask] for k, v in dest.items()}
 
-    # Sort both arrays to have the closest timestamps have same index
-    diff = np.argmin(np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :]), axis=0)
-    src = {k: v[diff] for k, v in src.items()}
+    # Time to seconds
+    time_minimal = min(src['time_ns'][0], dest['time_ns'][0])
+    src['time_ns'] = (src['time_ns'] - time_minimal) * 1e-9
+    dest['time_ns'] = (dest['time_ns'] - time_minimal) * 1e-9
 
-    diff = np.abs(src['time_ns'] - dest['time_ns'])*1e-9
-
+    # Plot differences and timestamps
     plt.figure()
-    plt.scatter(range(len(src['time_ns'])), src['time_ns'] * 1e-9, label='Left', s=2)
-    plt.scatter(range(len(dest['time_ns'])), dest['time_ns'] * 1e-9, label='Right', s=2)
+    plt.scatter(range(len(src['time_ns'])), src['time_ns'] / 60, label='Left', s=2)
+    plt.scatter(range(len(dest['time_ns'])), dest['time_ns'] / 60, label='Right', s=2)
     plt.title('Timestamps of frames')
+    plt.ylabel('Time [minutes]')
     plt.legend()
     plt.grid()
     plt.show()
 
+    diff = np.abs(src['time_ns'] - dest['time_ns']) * 1e6
     plt.figure()
     plt.scatter(range(len(diff)), diff, c='r', s=2)
     plt.plot(np.ones_like(src['time_ns'])*np.mean(diff))
     plt.grid()
     plt.title('Time difference between frames')
-    plt.ylabel('Time difference [s]')
+    plt.ylabel('Time difference [$\mu$s]')
     plt.show()
 
     print(f"Length of left: {len(src['time_ns']):,}")
     print(f"Length of right: {len(dest['time_ns']):,}")
-    print(f"Max time difference between frames: {np.max(diff):.2g} seconds")
-    print(f"Min time difference between frames: {np.min(diff):.2g} seconds")
+    print(f"Max time difference between frames: {np.max(diff):.0f} microseconds")
+    print(f"Min time difference between frames: {np.min(diff):.0f} microseconds")
     return src, dest
 
 
