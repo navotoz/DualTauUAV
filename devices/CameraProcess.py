@@ -139,7 +139,10 @@ class CameraCtrl(mp.Process):
             try:
                 with self._lock_camera:
                     try:
-                        self._barrier_camera_sync.wait(timeout=0.05)  # timeout set to 20Hz
+                        # timeout of barrier set to 5Hz.
+                        # Allows even one camera to keep working.
+                        # This low value (5Hz) prevents timeout on saving files.
+                        self._barrier_camera_sync.wait(timeout=0.2)
                     except RuntimeError:
                         pass
                     frame = self._camera.grab() if self._camera is not None else None
