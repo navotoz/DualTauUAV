@@ -22,12 +22,12 @@ class CameraCtrl(mp.Process):
     _camera: Tau2 = None
 
     def __init__(self, path_to_save: Union[str, Path],
-                 barrier_camera_sync: mp.Condition,
+                 barrier_camera_sync: mp.Barrier,
                  name: str = '', time_to_save: int = 10e9,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
-        self._barrier_camera_sync = barrier_camera_sync
+        self._barrier_camera_sync: mp.Barrier = barrier_camera_sync
 
         self._path_to_save = Path(path_to_save)
         if not self._path_to_save.is_dir():
@@ -137,7 +137,7 @@ class CameraCtrl(mp.Process):
         while True:
             try:
                 with self._lock_camera:
-                    self._barrier_camera_sync.wait()
+                    self._barrier_camera_sync.wait(timeout=0.05)  # timeout set to 20Hz
                     frame = self._camera.grab() if self._camera is not None else None
                     time_frame = time_ns()
             except Exception as e:
