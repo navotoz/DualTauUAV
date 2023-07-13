@@ -19,10 +19,14 @@ class ThreadDevices(th.Thread):
         params['ffc_mode'] = 'auto'
         params['ffc_period'] = 3600  # ffc every one minute
 
+        # Hardware rate setter
+        # If not connected, will be disregarded
+        self._th_hardware_trigger = th.Thread(target=self.th_rpi_trigger_for_cam, daemon=True, name='hardware_trigger')
+
         # Init cameras
         # Cams are synced by the barrier, which releases all cams simultaniously when N_CAMERAS acquire it.
         N_CAMERAS = 2
-        self._barrier_camera_sync = mp.Barrier(parties=N_CAMERAS) 
+        self._barrier_camera_sync = mp.Barrier(parties=N_CAMERAS)
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
                            barrier_camera_sync=self._barrier_camera_sync,
                            time_to_save=5e9)  # dump to disk every 5 seconds
@@ -34,6 +38,7 @@ class ThreadDevices(th.Thread):
         while self._camera_mono.camera_parameters_setting_position != EnumParameterPosition.DONE.value:
             sleep(1)
         self._camera_pan.start()
+        self._th_hardware_trigger.start()
 
     def __del__(self) -> None:
         try:
@@ -44,6 +49,38 @@ class ThreadDevices(th.Thread):
             self._camera_pan.terminate()
         except:
             pass
+
+    @staticmethod
+    def th_rpi_trigger_for_cam():
+        # The sampling rate of the cameras
+        FREQUENCY_CAMERAS = 30  # Hz
+        DUTY_CYCLE = 0.5
+        period = 1 / FREQUENCY_CAMERAS
+        low_time = period * DUTY_CYCLE  # seconds
+        high_time = period - low_time  # seconds
+
+        try:
+            import RPi.GPIO as GPIO
+
+            # Initialize the GPIO pin for the trigger signal
+            PIN_TRIGGER = 17
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(PIN_TRIGGER, GPIO.OUT)
+        except:
+            print('Could not initialize GPIO pin for trigger signal', flush=True)
+            return
+        print('Initialized hardware trigger for cameras', flush=True)
+
+        # Define a function to toggle the trigger signal at the given rate
+        while True:
+            # Set the trigger pin to high
+            GPIO.output(PIN_TRIGGER, GPIO.HIGH)
+            # Wait for half the period
+            sleep(low_time)
+            # Set the trigger pin to low
+            GPIO.output(PIN_TRIGGER, GPIO.LOW)
+            # Wait for the other half of the period
+            sleep(high_time)
 
     @property
     def rate_pan(self):

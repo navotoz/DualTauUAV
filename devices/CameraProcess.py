@@ -202,9 +202,9 @@ class CameraCtrl(mp.Process):
                      time_ns=np.stack(data['time_ns']))
             self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1
-            
+
             # Zeroize the rate
-            self._n_frames = 0 
+            self._n_frames = 0
             self._time_start = time_ns()
 
     @property
