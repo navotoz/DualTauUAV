@@ -34,11 +34,11 @@ class ThreadDevices(th.Thread):
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 
     def run(self) -> None:
+        self._th_hardware_trigger.start()
         self._camera_mono.start()
         while self._camera_mono.camera_parameters_setting_position != EnumParameterPosition.DONE.value:
             sleep(1)
         self._camera_pan.start()
-        self._th_hardware_trigger.start()
 
     def __del__(self) -> None:
         try:

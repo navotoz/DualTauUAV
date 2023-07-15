@@ -443,7 +443,7 @@ class Tau2:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
             return parsed_msg
 
-    def grab(self, to_temperature: bool = False, timeout_ns: float = 2e8):
+    def grab(self, to_temperature: bool = False, timeout_ns: float = 5e8):
         time_start = time_ns()
         self._buffer.clear_buffer()
 
