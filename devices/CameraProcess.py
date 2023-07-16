@@ -158,6 +158,8 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('fpa_update_time', []).append(self._fpa_update_time)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
+            else:
+                self._logger.warning('Skipped frame')
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect

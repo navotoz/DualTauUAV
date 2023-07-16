@@ -74,9 +74,9 @@ https://pimylifeup.com/raspberry-pi-low-voltage-warning/
 ![](devices/rpi_gpio_real.png)
 ![](devices/rpi_gpio_scheme.png)
 Connection:
-   - Yellow with orange strip (5 in the JST) -> GND, AKA Pin 9
-   - Blue with orange strip (7 in the JST) -> GPIO 17, AKA Pin 11
-   - Blue strip (6 in the JST) -> GPIO 27, AKA Pin 13
+   - Blue with orange strip (7 in the JST) -> GND, AKA Pin 9
+   - Yellow with orange strip (8 in the JST) -> GPIO 17, AKA Pin 11
+   - Blue (6 in the JST) -> GPIO 27, AKA Pin 13
 
 
 
