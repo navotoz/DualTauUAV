@@ -39,7 +39,6 @@ class CameraCtrl(mp.Process):
         self._lock_measurements = th.Lock()
         self._frames = {}
         self._fpa, self._housing = 0, 0
-        self._fpa_update_time = time_ns()
         self._time_to_save = time_to_save
 
         # process-safe param setting position
@@ -115,7 +114,6 @@ class CameraCtrl(mp.Process):
                 with self._lock_measurements:
                     if t_type == T_FPA:
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
-                        self._fpa_update_time = time_ns()
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
             except (BrokenPipeError, RuntimeError):
@@ -155,7 +153,6 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('time_ns', []).append(time_frame)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
-                    self._frames.setdefault('fpa_update_time', []).append(self._fpa_update_time)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
             else:
@@ -200,7 +197,6 @@ class CameraCtrl(mp.Process):
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
                      #  housing=np.stack(data['housing']),
-                     fpa_update_time=np.stack(data['fpa_update_time']),
                      time_ns=np.stack(data['time_ns']))
             self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1
