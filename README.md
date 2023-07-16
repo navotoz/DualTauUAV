@@ -92,3 +92,8 @@ Connection:
 ### ThermalCapture GrabberUSB
 ![](devices/ImageTeaxGrabber2.png)
 ![](devices/PinoutTeaxGrabber2.png)
+
+
+# Run tkinter in ssh
+- In terminal:
+``` export DISPLAY=:0.0 ```

@@ -1,3 +1,7 @@
+import os
+if os.environ.get('DISPLAY','') == '':
+    os.environ.__setitem__('DISPLAY', ':0.0')
+
 import pyftdi.ftdi
 from PIL import ImageTk
 

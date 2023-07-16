@@ -138,13 +138,21 @@ class CameraCtrl(mp.Process):
         while True:
             try:
                 with self._lock_camera:
-                    frame, time_of_frame = self._camera.grab(barrier=self._barrier_camera_sync)
+                    # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
+                    # Allows even one camera to keep working.
+                    # This low value (5Hz) prevents timeout on saving files.
+                    try:
+                        self._barrier_camera_sync.wait(timeout=0.2)
+                    except RuntimeError:
+                        pass
+                    frame, time_of_start, time_of_end = self._camera.grab()
             except Exception as e:
                 self._logger.error(f'Exception in _th_getter_frame: {e}')
                 self.terminate()
             if frame is not None:
                 with self._lock_measurements:
-                    self._frames.setdefault('time_ns', []).append(time_of_frame)
+                    self._frames.setdefault('time_ns_start', []).append(time_of_start)
+                    self._frames.setdefault('time_ns_end', []).append(time_of_end)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
                     # self._frames.setdefault('housing', []).append(self._housing)
@@ -180,7 +188,7 @@ class CameraCtrl(mp.Process):
             now = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             path = (self._path_to_save / f'{now}').with_suffix('.npz')
             with self._lock_measurements:
-                if not isinstance(self._frames, dict) or not self._frames.get('time_ns', []):
+                if not isinstance(self._frames, dict) or not self._frames.get('time_ns_start', []):
                     continue
                 data = self._frames
                 self._frames = {}
@@ -189,7 +197,8 @@ class CameraCtrl(mp.Process):
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
                      #  housing=np.stack(data['housing']),
-                     time_ns=np.stack(data['time_ns']))
+                     time_ns_end=np.stack(data['time_ns_end']),
+                     time_ns_start=np.stack(data['time_ns_start']))
             self._logger.info(f'Dumped image {str(path)}')
             self._n_files_saved.value = self._n_files_saved.value + 1
 
