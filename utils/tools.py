@@ -49,6 +49,6 @@ def load_files_from_dir(path):
             data = np.load(path.with_suffix('.npz'))
         except:
             raise FileNotFoundError(f'No files found in {path}')
-    indices = np.argsort(data['time_ns'])
+    indices = np.argsort(data['time_ns_start'])
     data = {k: np.stack(v)[indices] for k, v in data.items()}
     return data

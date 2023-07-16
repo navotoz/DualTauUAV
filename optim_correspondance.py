@@ -31,16 +31,18 @@ def load_src_and_dest(path_to_files):
     dest = load_files_from_dir(path_to_files / 'mono')
 
     print(f"List of keys in dict: {list(dest.keys())}\n")
-    print(f"Number of left frames: {len(src['time_ns']):,}")
-    print(f"Number of right frames: {len(dest['time_ns']):,}")
+    print(f"Number of left frames: {len(src['time_ns_start']):,}")
+    print(f"Number of right frames: {len(dest['time_ns_start']):,}")
     return src, dest
 
 
 def _get_diff(src, dest):
-    if len(src['time_ns']) > len(dest['time_ns']):
-        return 'src', np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :])
-    else:
-        return 'dest', np.abs(src['time_ns'][None, :] - dest['time_ns'][:, None])
+    times_src = np.stack([src['time_ns_start'], src['time_ns_end']]).copy().astype(float)
+    times_dest = np.stack([dest['time_ns_start'], dest['time_ns_end']]).copy().astype(float)
+    diff = np.abs((times_dest.T[..., None] - times_src[None, ...]))
+    diff_start = diff[:, 0]
+    diff_end = diff[:, 1]
+    return diff_start, diff_end
 
 
 def fix_timing_between_left_and_right(*,
@@ -52,18 +54,32 @@ def fix_timing_between_left_and_right(*,
     max_time_diff_ns = max_time_diff * 1e9
 
     # Align the two arrays
-    which_is_longer, diff = _get_diff(src, dest)
-    diff = diff.argmin(axis=0)
-    if which_is_longer == 'src':
+    diff_start, diff_end = _get_diff(src, dest)
+    if len(src['time_ns_start']) > len(dest['time_ns_start']):
+        diff_start = diff_start.argmin(axis=1)
+        diff_end = diff_end.argmin(axis=1)
+        mask = diff_start == diff_end
+        diff = diff_start[mask]
         src = {k: v[diff] for k, v in src.items()}
-    elif which_is_longer == 'dest':
+        dest = {k: v[mask] for k, v in dest.items()}
+    else:
+        raise NotImplementedError
+        diff = diff.argmin(axis=0)
         dest = {k: v[diff] for k, v in dest.items()}
 
     # Filter out frames that are too far apart
-    diff = _get_diff(src, dest)[1].diagonal()
-    mask = diff <= max_time_diff_ns
+    diff_start, diff_end = _get_diff(src, dest)
+    mask = (diff_start.diagonal() <= max_time_diff_ns) & (diff_end.diagonal() <= max_time_diff_ns)
     src = {k: v[mask] for k, v in src.items()}
     dest = {k: v[mask] for k, v in dest.items()}
+
+    # Replace the start and end times with the mean of the two
+    src['time_ns'] = (src['time_ns_start'] + src['time_ns_end']) / 2
+    dest['time_ns'] = (dest['time_ns_start'] + dest['time_ns_end']) / 2
+    src.pop('time_ns_start')
+    src.pop('time_ns_end')
+    dest.pop('time_ns_start')
+    dest.pop('time_ns_end')
 
     # Time to seconds
     time_minimal = min(src['time_ns'][0], dest['time_ns'][0])
