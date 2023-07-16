@@ -53,7 +53,7 @@ class ThreadDevices(th.Thread):
     @staticmethod
     def th_rpi_trigger_for_cam():
         # The sampling rate of the cameras
-        FREQUENCY_CAMERAS = 30  # Hz
+        FREQUENCY_CAMERAS = 40  # Hz
         DUTY_CYCLE = 0.5
         period = 1 / FREQUENCY_CAMERAS
         low_time = period * DUTY_CYCLE  # seconds
@@ -65,6 +65,7 @@ class ThreadDevices(th.Thread):
             # Initialize the GPIO pin for the trigger signal
             PIN_TRIGGER = 17
             GPIO.setmode(GPIO.BCM)
+            GPIO.cleanup()
             GPIO.setup(PIN_TRIGGER, GPIO.OUT)
         except:
             print('Could not initialize GPIO pin for trigger signal', flush=True)
@@ -76,11 +77,11 @@ class ThreadDevices(th.Thread):
             # Set the trigger pin to high
             GPIO.output(PIN_TRIGGER, GPIO.HIGH)
             # Wait for half the period
-            sleep(low_time)
+            sleep(high_time)
             # Set the trigger pin to low
             GPIO.output(PIN_TRIGGER, GPIO.LOW)
             # Wait for the other half of the period
-            sleep(high_time)
+            sleep(low_time)
 
     @property
     def rate_pan(self):
