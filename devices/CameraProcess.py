@@ -116,7 +116,9 @@ class CameraCtrl(mp.Process):
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
+                self._logger.info(f'{t_type} temperature update successful.')
             except (BrokenPipeError, RuntimeError):
+                self._logger.info(f'{t_type} temperature update failed.')
                 pass
 
     def _th_getter_temperature(self) -> None:
@@ -136,27 +138,17 @@ class CameraCtrl(mp.Process):
         while True:
             try:
                 with self._lock_camera:
-                    try:
-                        # timeout of barrier set to 5Hz.
-                        # Allows even one camera to keep working.
-                        # This low value (5Hz) prevents timeout on saving files.
-                        self._barrier_camera_sync.wait(timeout=0.2)
-                    except RuntimeError:
-                        pass
-                    frame = self._camera.grab() if self._camera is not None else None
-                    time_frame = time_ns()
+                    frame, time_of_frame = self._camera.grab(barrier=self._barrier_camera_sync)
             except Exception as e:
                 self._logger.error(f'Exception in _th_getter_frame: {e}')
                 self.terminate()
             if frame is not None:
                 with self._lock_measurements:
-                    self._frames.setdefault('time_ns', []).append(time_frame)
+                    self._frames.setdefault('time_ns', []).append(time_of_frame)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
-            else:
-                self._logger.warning('Skipped frame')
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect

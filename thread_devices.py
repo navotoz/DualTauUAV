@@ -53,7 +53,7 @@ class ThreadDevices(th.Thread):
     @staticmethod
     def th_rpi_trigger_for_cam():
         # The sampling rate of the cameras
-        FREQUENCY_CAMERAS = 40  # Hz
+        FREQUENCY_CAMERAS = 30  # Hz
         DUTY_CYCLE = 0.5
         period = 1 / FREQUENCY_CAMERAS
         low_time = period * DUTY_CYCLE  # seconds

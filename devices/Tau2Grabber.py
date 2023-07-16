@@ -1,5 +1,6 @@
+from multiprocessing import Barrier
 from time import sleep, time_ns
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 from usb.core import USBError
 from pyftdi.ftdi import Ftdi, FtdiError
 import yaml
@@ -443,35 +444,44 @@ class Tau2:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
             return parsed_msg
 
-    def grab(self, to_temperature: bool = False, timeout_ns: float = 5e8):
-        time_start = time_ns()
+    def grab(self, barrier: Barrier, to_temperature: bool = False, timeout_ns: float = 5e8) -> Tuple[np.ndarray, int]:
         self._buffer.clear_buffer()
 
+        time_start = time_ns()
         while time_ns() - time_start < timeout_ns:
             if self._buffer.sync_teax():
                 break
             self._buffer += self._ftdi.read_data(self._ftdi_read_chunksize)
 
-        while time_ns() - time_start < timeout_ns:
+        try:
+            # timeout of barrier set to 1Hz.
+            # Allows even one camera to keep working.
+            # This low value (1Hz) prevents timeout on saving files.
+            barrier.wait(timeout=1)
+        except RuntimeError:
+            pass
+
+        time_of_frame = time_ns()
+        while time_ns() - time_of_frame < timeout_ns:
             if len(self._buffer) >= self._frame_size:
                 break
             self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize, self._frame_size - len(self._buffer)))
 
         res = self._buffer[:self._frame_size]
         if len(res) < 8:  # must have at least 8 bytes to find the magic word and frame width
-            return None
+            return None, time_of_frame
         magic_word = struct.unpack('h', res[6:8])[0]
         frame_width = struct.unpack('h', res[1:3])[0] - 2
         if magic_word != 0x4000 or frame_width != self.width:
-            return None
+            return None, time_of_frame
         raw_image_8bit = np.frombuffer(res[6:], dtype='uint8')
         if len(raw_image_8bit) != (2 * (self.width + 2)) * self.height:
-            return None
+            return None, time_of_frame
         raw_image_8bit = raw_image_8bit.reshape((-1, 2 * (self.width + 2)))
         if not is_8bit_image_borders_valid(raw_image_8bit, self.height):
-            return None
+            return None, time_of_frame
 
         raw_image_16bit = 0x3FFF & np.array(raw_image_8bit).view('uint16')[:, 1:-1]
         if to_temperature:
             raw_image_16bit = 0.04 * raw_image_16bit - KELVIN2CELSIUS
-        return raw_image_16bit
+        return raw_image_16bit, time_of_frame
