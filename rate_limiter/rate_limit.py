@@ -4,7 +4,7 @@ from time import sleep
 
 
 # The sampling rate of the cameras
-FREQUENCY_CAMERAS = 30  # Hz
+FREQUENCY_CAMERAS = 60  # Hz
 DUTY_CYCLE = 0.5
 period = 1 / FREQUENCY_CAMERAS
 low_time = period * DUTY_CYCLE  # seconds

@@ -18,3 +18,5 @@ services:
     build: rate_limiter/.
     restart: always
     privileged: true
+    devices:
+      - '/dev:/dev'

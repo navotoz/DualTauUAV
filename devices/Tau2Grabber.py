@@ -15,7 +15,8 @@ from utils.tools import make_logger
 
 KELVIN2CELSIUS = 273.15
 SYNC_MSG = b'SYNC' + struct.pack(4 * 'B', *[0, 0, 0, 0])
-TEAX_LEN = 4
+TEAX_IN_BYTES = b'TEAX'
+TEAX_LEN = len(TEAX_IN_BYTES)
 
 
 class Tau2:
@@ -352,7 +353,7 @@ class Tau2:
                 return
 
     def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
-        SLEEP_BETWEEN_PARAMS = 0.2
+        SLEEP_BETWEEN_PARAMS = 0.4
         if isinstance(yaml_or_dict, Path):
             params = yaml.safe_load(yaml_or_dict)
         else:
@@ -445,32 +446,20 @@ class Tau2:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
             return parsed_msg
 
-    def grab(self, to_temperature: bool = False, timeout_ns: float = 3e8) -> Tuple[np.ndarray, int, int]:
-        res = b''
-        time_of_start = time_of_frame = time_ns()
-
+    def grab(self, to_temperature: bool = False) -> Tuple[np.ndarray, int, int]:
         # Sync to the next frame by the TEAX magic word
-        while time_ns() - time_of_start < timeout_ns:
-            res += self._ftdi.read_data(self._ftdi_read_chunksize)
-            idx_sync = res.rfind(b'TEAX')
-            if idx_sync != -1:
-                time_of_frame = time_ns()
-                res = res[idx_sync + TEAX_LEN:]
-                break
-
-        # Read the frame
-        while time_ns() - time_of_start < timeout_ns:
-            if len(res) >= self._frame_size:
-                break
-            res += self._ftdi.read_data(min(self._ftdi_read_chunksize, self._frame_size - len(res)))
+        time_of_frame = time_ns()
+        res = bytes(self._ftdi.read_data_bytes(TEAX_LEN + self._frame_size, attempt=1))
         time_of_end = time_ns()
+        if not res.startswith(TEAX_IN_BYTES):
+            return None, time_of_frame, time_of_end
+        res = res[TEAX_LEN:]
 
         # Data must have at least 8 bytes to find the magic word and frame width
-        if len(res) < 8:
+        if len(res) != self._frame_size:
             return None, time_of_frame, time_of_end
 
         # Check the magic word and frame width
-        res = res[:self._frame_size]
         magic_word = struct.unpack('h', res[6:8])[0]
         frame_width = struct.unpack('h', res[1:3])[0] - 2
         if magic_word != 0x4000 or frame_width != self.width:
