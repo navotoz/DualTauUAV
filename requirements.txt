@@ -5,5 +5,3 @@ flask
 gunicorn
 pyyaml
 pyftdi  # Tau2
-
-RPi.GPIO  # hardware trigger
