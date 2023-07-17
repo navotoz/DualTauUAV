@@ -10,3 +10,4 @@
 *.stl
 **/rawData/
 *.npz
+*.xml

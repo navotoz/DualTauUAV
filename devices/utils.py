@@ -1,7 +1,6 @@
 import binascii
 import re
 import struct
-import threading as th
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -14,69 +13,8 @@ from devices.tau2_config import Code
 _list_of_connected_camera = []
 
 
-BUFFER_SIZE = int(2 ** 24)  # 16 MBytes
-TEAX_LEN = 4
-UART_PREAMBLE_LENGTH = 6
 REPLY_HEADER_BYTES = 10
 BORDER_VALUE = 64
-
-
-class BytesBuffer:
-    def __init__(self, size_to_signal: int = 0) -> None:
-        self._buffer: bytes = b''
-        self._lock = th.RLock()
-        self._size_to_signal = size_to_signal
-
-    def clear_buffer(self) -> None:
-        with self._lock:
-            self._buffer = b''
-
-    def sync_teax(self) -> bool:
-        with self._lock:
-            idx_sync = self._buffer.rfind(b'TEAX')
-            if idx_sync != -1:
-                self._buffer = self._buffer[idx_sync + TEAX_LEN:]
-                return True
-            return False
-
-    def sync_uart(self) -> bool:
-        with self._lock:
-            idx_sync = self._buffer.rfind(b'UART')
-            if idx_sync != -1:
-                self._buffer = self._buffer[idx_sync:]
-                return True
-            return False
-
-    def __len__(self) -> int:
-        with self._lock:
-            return len(self._buffer)
-
-    def __add__(self, other: bytes):
-        with self._lock:
-            self._buffer += other
-            if len(self._buffer) > BUFFER_SIZE:
-                self._buffer = self._buffer[-BUFFER_SIZE:]
-            return self._buffer
-
-    def __iadd__(self, other: bytes):
-        with self._lock:
-            self._buffer += other
-            if len(self._buffer) > BUFFER_SIZE:
-                self._buffer = self._buffer[-BUFFER_SIZE:]
-            return self
-
-    def __getitem__(self, item: slice) -> bytes:
-        with self._lock:
-            if isinstance(item, slice):
-                return self._buffer[item]
-
-    def __call__(self) -> bytes:
-        return self.buffer
-
-    @property
-    def buffer(self) -> bytes:
-        with self._lock:
-            return self._buffer
 
 
 def generate_subsets_indices_in_string(input_string: bytes) -> list:

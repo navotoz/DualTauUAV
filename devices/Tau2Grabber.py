@@ -1,4 +1,3 @@
-from multiprocessing import Barrier
 from time import sleep, time_ns
 from typing import Optional, Tuple, Union
 from usb.core import USBError
@@ -8,14 +7,15 @@ import numpy as np
 from pathlib import Path
 import struct
 
-from devices.utils import connect_ftdi, is_8bit_image_borders_valid, BytesBuffer, \
-    REPLY_HEADER_BYTES, parse_incoming_message, make_packet
+from devices.utils import (connect_ftdi, is_8bit_image_borders_valid,
+                           REPLY_HEADER_BYTES, parse_incoming_message, make_packet)
 from devices import HEIGHT_IMAGE_TAU2, T_FPA, T_HOUSING, WIDTH_IMAGE_TAU2, EnumParameterPosition
 import devices.tau2_config as ptc
 from utils.tools import make_logger
 
 KELVIN2CELSIUS = 273.15
 SYNC_MSG = b'SYNC' + struct.pack(4 * 'B', *[0, 0, 0, 0])
+TEAX_LEN = 4
 
 
 class Tau2:
@@ -28,11 +28,11 @@ class Tau2:
             self._ftdi, address = connect_ftdi(vid, pid)
         except (RuntimeError, USBError):
             raise RuntimeError('Could not connect to the Tau2 camera.')
+        self._ftdi.read_data_set_chunksize(chunksize=0)
         self._ftdi_read_chunksize = self._ftdi.read_data_get_chunksize()
         self.param_position: EnumParameterPosition = EnumParameterPosition.DISCONNECTED
 
         self._frame_size = 2 * self.height * self.width + 6 + 4 * self.height  # 6 byte header, 4 bytes pad per row
-        self._buffer = BytesBuffer(size_to_signal=self._frame_size)
         self._logger.info(f'Found device in {address}.')
 
     @property
@@ -445,34 +445,47 @@ class Tau2:
             return parsed_msg
 
     def grab(self, to_temperature: bool = False, timeout_ns: float = 3e8) -> Tuple[np.ndarray, int, int]:
-        self._buffer.clear_buffer()
+        res = b''
+        time_of_start = time_of_frame = time_ns()
 
-        time_of_frame = time_ns()
-        while time_ns() - time_of_frame < timeout_ns:
-            if self._buffer.sync_teax():
+        # Sync to the next frame by the TEAX magic word
+        while time_ns() - time_of_start < timeout_ns:
+            res += self._ftdi.read_data(self._ftdi_read_chunksize)
+            idx_sync = res.rfind(b'TEAX')
+            if idx_sync != -1:
+                time_of_frame = time_ns()
+                res = res[idx_sync + TEAX_LEN:]
                 break
-            self._buffer += self._ftdi.read_data(self._ftdi_read_chunksize)
 
-        while time_ns() - time_of_frame < timeout_ns:
-            if len(self._buffer) >= self._frame_size:
+        # Read the frame
+        while time_ns() - time_of_start < timeout_ns:
+            if len(res) >= self._frame_size:
                 break
-            self._buffer += self._ftdi.read_data(min(self._ftdi_read_chunksize, self._frame_size - len(self._buffer)))
+            res += self._ftdi.read_data(min(self._ftdi_read_chunksize, self._frame_size - len(res)))
         time_of_end = time_ns()
 
-        res = self._buffer[:self._frame_size]
-        if len(res) < 8:  # must have at least 8 bytes to find the magic word and frame width
+        # Data must have at least 8 bytes to find the magic word and frame width
+        if len(res) < 8:
             return None, time_of_frame, time_of_end
+
+        # Check the magic word and frame width
+        res = res[:self._frame_size]
         magic_word = struct.unpack('h', res[6:8])[0]
         frame_width = struct.unpack('h', res[1:3])[0] - 2
         if magic_word != 0x4000 or frame_width != self.width:
             return None, time_of_frame, time_of_end
+
+        # Check the size of the frames
         raw_image_8bit = np.frombuffer(res[6:], dtype='uint8')
         if len(raw_image_8bit) != (2 * (self.width + 2)) * self.height:
             return None, time_of_frame, time_of_end
+
+        # Check the borders
         raw_image_8bit = raw_image_8bit.reshape((-1, 2 * (self.width + 2)))
         if not is_8bit_image_borders_valid(raw_image_8bit, self.height):
             return None, time_of_frame, time_of_end
 
+        # Convert to 16bit and remove the borders
         raw_image_16bit = 0x3FFF & np.array(raw_image_8bit).view('uint16')[:, 1:-1]
         if to_temperature:
             raw_image_16bit = 0.04 * raw_image_16bit - KELVIN2CELSIUS

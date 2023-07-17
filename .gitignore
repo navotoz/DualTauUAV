@@ -7,3 +7,4 @@
 *.npz
 **/rawData
 *:Zone.Identifier
+*.xml
