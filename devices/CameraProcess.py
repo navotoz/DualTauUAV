@@ -22,7 +22,7 @@ class CameraCtrl(mp.Process):
     _camera: Tau2 = None
 
     def __init__(self, path_to_save: Union[str, Path],
-                 barrier_camera_sync: mp.Barrier,
+                 barrier_camera_sync: mp.Barrier, counter_frames: mp.Value,
                  name: str = '', time_to_save: int = 10e9,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
@@ -40,6 +40,7 @@ class CameraCtrl(mp.Process):
         self._frames = {}
         self._fpa, self._housing = 0, 0
         self._time_to_save = time_to_save
+        self._counter = counter_frames
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -144,9 +145,9 @@ class CameraCtrl(mp.Process):
 
                 # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
                 # Allows even one camera to keep working.
-                # This low value (5Hz) prevents timeout on saving files.
+                # This low value (2Hz) prevents timeout on saving files.
                 try:
-                    self._barrier_camera_sync.wait(timeout=0.2)
+                    self._barrier_camera_sync.wait(timeout=0.5)
                 except RuntimeError:
                     pass
                 frame, time_of_start, time_of_end = self._camera.grab()
@@ -156,6 +157,7 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('time_ns_end', []).append(time_of_end)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
+                    self._frames.setdefault('counter', []).append(self._counter.value)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
 
@@ -198,6 +200,7 @@ class CameraCtrl(mp.Process):
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
                      #  housing=np.stack(data['housing']),
+                     counter=np.stack(data['counter']),
                      time_ns_end=np.stack(data['time_ns_end']),
                      time_ns_start=np.stack(data['time_ns_start']))
             self._logger.info(f'Dumped image {str(path)}')

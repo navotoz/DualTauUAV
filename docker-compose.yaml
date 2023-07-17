@@ -4,9 +4,6 @@ services:
     build: .
     ports:
       - "8080:8080"
-    privileged: true
-    devices:
-      - '/dev:/dev'
     volumes:
       - type: bind
         source: ./measurements
@@ -14,3 +11,6 @@ services:
         bind:
           create_host_path: true
     restart: always
+    privileged: true
+    devices:
+      - '/dev:/dev'

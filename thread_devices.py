@@ -1,3 +1,4 @@
+from ctypes import c_uint
 from functools import partial
 import threading as th
 from time import sleep
@@ -48,19 +49,21 @@ class ThreadDevices(th.Thread):
         # Before the barrier is released, the cameras are purged.
         N_CAMERAS = 2
         N_CTRL_THREADS = 1
+        self._counter: mp.Value = mp.Value(c_uint)
+        self._counter.value = 0
         self._barrier_camera_sync = mp.Barrier(parties=N_CAMERAS + N_CTRL_THREADS)
-        self._th_hardware_trigger = th.Thread(target=self.th_rpi_trigger_for_cam, daemon=True, name='hardware_trigger')
+        self._mp_hardware_trigger = mp.Process(target=self.mp_rpi_trigger_for_cam, daemon=True, name='hardware_trigger')
 
         # Init cameras
         # Cams are synced by the barrier, which releases all cams simultaneously when N_CAMERAS acquire it.
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
                            barrier_camera_sync=self._barrier_camera_sync,
-                           time_to_save=5e9)  # dump to disk every 5 seconds
+                           counter_frames=self._counter, time_to_save=2e9)  # dump to disk every 2 seconds
         self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
         self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
 
     def run(self) -> None:
-        self._th_hardware_trigger.start()
+        self._mp_hardware_trigger.start()
         self._camera_mono.start()
         while self._camera_mono.camera_parameters_setting_position != EnumParameterPosition.DONE.value:
             sleep(1)
@@ -77,9 +80,9 @@ class ThreadDevices(th.Thread):
             pass
         GPIO.cleanup()
 
-    def th_rpi_trigger_for_cam(self):
+    def mp_rpi_trigger_for_cam(self):
         # The sampling rate of the cameras
-        FREQUENCY_CAMERAS = 50  # Hz
+        FREQUENCY_CAMERAS = 30  # Hz
         DUTY_CYCLE = 0.01  # 1% duty cycle
         period = 1 / FREQUENCY_CAMERAS
         low_time = period * DUTY_CYCLE  # seconds
@@ -95,9 +98,9 @@ class ThreadDevices(th.Thread):
 
         # Define a function to toggle the trigger signal at the given rate
         while True:
-            # Wait for all cameras to reach the barrier so its released, at most FREQUENCY_CAMERAS // 5 times per second
+            # Wait for all cameras to reach the barrier so its released, at most period * 10 times per second
             try:
-                self._barrier_camera_sync.wait(timeout=FREQUENCY_CAMERAS // 5)
+                self._barrier_camera_sync.wait(timeout=period * 10)
             except RuntimeError:
                 pass
 
@@ -109,6 +112,7 @@ class ThreadDevices(th.Thread):
             GPIO.output(PIN_TRIGGER, GPIO.HIGH)
             # Wait for high_time of duty cycle
             sleep(high_time)
+            self._counter.value = self._counter.value + 1
 
     @property
     def rate_pan(self):

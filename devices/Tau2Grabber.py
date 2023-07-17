@@ -447,12 +447,15 @@ class Tau2:
             return parsed_msg
 
     def purge(self) -> None:
-        self._ftdi.purge_buffers()
+        time_start = time_ns()
+        while time_ns() - time_start < 1e8:
+            if not self._ftdi.read_data(self._ftdi_read_chunksize):
+                return
 
     def grab(self, to_temperature: bool = False) -> Tuple[np.ndarray, int, int]:
         # Sync to the next frame by the TEAX magic word
         time_of_frame = time_ns()
-        res = bytes(self._ftdi.read_data_bytes(TEAX_LEN + self._frame_size, attempt=1))
+        res = bytes(self._ftdi.read_data_bytes(TEAX_LEN + self._frame_size, attempt=3))
         time_of_end = time_ns()
         if not res.startswith(TEAX_IN_BYTES):
             return None, time_of_frame, time_of_end
