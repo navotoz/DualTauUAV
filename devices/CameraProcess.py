@@ -94,8 +94,8 @@ class CameraCtrl(mp.Process):
                 th_update_state = th.Thread(target=self._update_params, daemon=True)
                 th_update_state.start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
-                th_update_state.join()
                 self._camera.param_position = EnumParameterPosition.DONE
+                th_update_state.join()
                 self._logger.info('Finished setting parameters.')
                 self._getter_temperature(T_FPA)
                 # self._getter_temperature(T_HOUSING)
