@@ -352,55 +352,56 @@ class Tau2:
                 return
 
     def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
+        SLEEP_BETWEEN_PARAMS = 0.2
         if isinstance(yaml_or_dict, Path):
             params = yaml.safe_load(yaml_or_dict)
         else:
             params = yaml_or_dict.copy()
         self.param_position = EnumParameterPosition.CONNECTED
         self.ffc_mode = params.get('ffc_mode', 'manual')
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.FFC_MODE
         self.ffc_period = params.get('ffc_period', 0)  # default is no ffc
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.FFC_PERIOD
         self.ace = params.get('ace', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.ACE
         self.tlinear = params.get('tlinear', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.TLINEAR
         self.isotherm = params.get('isotherm', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.ISOTHERM
         self.dde = params.get('dde', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.DDE
         self.gain = params.get('gain', 'high')
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.GAIN
         self.agc = params.get('agc', 'manual')
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.AGC
         self.sso = params.get('sso', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.SSO
         self.contrast = params.get('contrast', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.CONTRAST
         self.brightness = params.get('brightness', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.BRIGHTNESS
         self.brightness_bias = params.get('brightness_bias', 0)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.BRIGHTNESS_BIAS
         self.cmos_depth = params.get('cmos_depth', 0)  # 14bit pre AGC
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.CMOS_DEPTH
         self.fps = params.get('fps', ptc.FPS_CODE_DICT[60])  # 60Hz NTSC
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.FPS
         self.lens_number = params.get('lens_number', 1)
-        sleep(0.5)
+        sleep(SLEEP_BETWEEN_PARAMS)
         self.param_position = EnumParameterPosition.LENS_NUMBER
         # self.correction_mask = params.get('corr_mask', 0)  # Always OFF!!!
         self.param_position = EnumParameterPosition.DONE

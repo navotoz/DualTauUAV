@@ -91,8 +91,10 @@ class CameraCtrl(mp.Process):
         while True:
             try:
                 self._camera = Tau2(name=self._name)
-                th.Thread(target=self._update_params, daemon=True).start()
+                th_update_state = th.Thread(target=self._update_params, daemon=True)
+                th_update_state.start()
                 self._camera.set_params_by_dict(self._camera_params) if self._camera_params else None
+                th_update_state.join()
                 self._camera.param_position = EnumParameterPosition.DONE
                 self._logger.info('Finished setting parameters.')
                 self._getter_temperature(T_FPA)
@@ -136,19 +138,15 @@ class CameraCtrl(mp.Process):
         self._barrier_camera_sync.wait(timeout=None)  # sync the initialization of both cameras
         self._time_start = time_ns()
         while True:
-            try:
-                with self._lock_camera:
-                    # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
-                    # Allows even one camera to keep working.
-                    # This low value (5Hz) prevents timeout on saving files.
-                    try:
-                        self._barrier_camera_sync.wait(timeout=0.2)
-                    except RuntimeError:
-                        pass
-                    frame, time_of_start, time_of_end = self._camera.grab()
-            except Exception as e:
-                self._logger.error(f'Exception in _th_getter_frame: {e}')
-                self.terminate()
+            with self._lock_camera:
+                # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
+                # Allows even one camera to keep working.
+                # This low value (5Hz) prevents timeout on saving files.
+                try:
+                    self._barrier_camera_sync.wait(timeout=0.2)
+                except RuntimeError:
+                    pass
+                frame, time_of_start, time_of_end = self._camera.grab()
             if frame is not None:
                 with self._lock_measurements:
                     self._frames.setdefault('time_ns_start', []).append(time_of_start)
