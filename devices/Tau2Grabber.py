@@ -28,7 +28,7 @@ class Tau2:
             self._ftdi, address = connect_ftdi(vid, pid)
         except (RuntimeError, USBError):
             raise RuntimeError('Could not connect to the Tau2 camera.')
-        self._ftdi.read_data_set_chunksize(chunksize=0)
+        self._ftdi.read_data_set_chunksize(chunksize=2**14)
         self._ftdi_read_chunksize = self._ftdi.read_data_get_chunksize()
         self.param_position: EnumParameterPosition = EnumParameterPosition.DISCONNECTED
 

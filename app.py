@@ -12,7 +12,7 @@ from devices.CameraProcess import CameraCtrl
 app = Flask(__name__)
 
 
-def _make_status(self, stat: int):
+def _make_status(stat: int):
     stat = EnumParameterPosition(stat)
     if stat == EnumParameterPosition.DONE:
         return 'Ready'
@@ -40,7 +40,7 @@ N_CAMERAS = 2
 barrier_camera_sync = mp.Barrier(parties=N_CAMERAS)
 func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
                    barrier_camera_sync=barrier_camera_sync,
-                   time_to_save=5e9)  # dump to disk every 5 seconds
+                   time_to_save=3e9)  # dump to disk every 3 seconds
 camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
 camera_pan.start()
 camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
