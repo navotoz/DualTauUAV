@@ -1,5 +1,5 @@
+import logging
 from RPi import GPIO
-from threading import Thread
 from time import sleep
 
 
@@ -14,29 +14,35 @@ high_time = period - low_time  # seconds
 PIN_TRIGGER = 17
 
 
-def th_rpi_trigger_for_cam():
-    # Define a function to toggle the trigger signal at the given rate
-    while True:
-        # Set the trigger pin to high
-        GPIO.output(PIN_TRIGGER, GPIO.HIGH)
-        # Wait for half the period
-        sleep(high_time)
-        # Set the trigger pin to low
-        GPIO.output(PIN_TRIGGER, GPIO.LOW)
-        # Wait for the other half of the period
-        sleep(low_time)
-
-
 if __name__ == '__main__':
+    logger = logging.getLogger('rateLimiter')
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(name)s - %(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Create a stdout handler
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setLevel(logging.INFO)
+    stdout_handler.setFormatter(formatter)
+
+    # Add the stdout handler to the logger
+    logger.addHandler(stdout_handler)
+    
     GPIO.setmode(GPIO.BCM)
     try:
         GPIO.cleanup()
         GPIO.setup(PIN_TRIGGER, GPIO.OUT)
+        logger.info('Setup complete, starting...')
 
         # Hardware rate setter
-        th_hardware_trigger = Thread(target=th_rpi_trigger_for_cam, daemon=False, name='hardware_trigger')
-        th_hardware_trigger.start()
-        th_hardware_trigger.join()
+        while True:
+            # Set the trigger pin to high
+            GPIO.output(PIN_TRIGGER, GPIO.HIGH)
+            # Wait for half the period
+            sleep(high_time)
+            # Set the trigger pin to low
+            GPIO.output(PIN_TRIGGER, GPIO.LOW)
+            # Wait for the other half of the period
+            sleep(low_time)
     except Exception as e:
         print(str(e))
     finally:

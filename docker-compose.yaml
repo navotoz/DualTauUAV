@@ -17,3 +17,4 @@ services:
   rate_limiter:
     build: rate_limiter/.
     restart: always
+    privileged: true
