@@ -16,6 +16,4 @@ RUN /venv/bin/pip3 install RPi.GPIO --no-cache-dir --index-url https://www.piwhe
 FROM build-venv as build
 COPY . /app
 WORKDIR /app
-
-# Set a single worker thread (-w 1) to avoid instansiating the cameras twice
-CMD ["/venv/bin/python", "rate_limit.py"]
+CMD ["/venv/bin/python3", "rate_limit.py"]

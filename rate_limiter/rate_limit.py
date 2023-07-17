@@ -29,10 +29,15 @@ def th_rpi_trigger_for_cam():
 
 if __name__ == '__main__':
     GPIO.setmode(GPIO.BCM)
-    GPIO.cleanup()
-    GPIO.setup(PIN_TRIGGER, GPIO.OUT)
+    try:
+        GPIO.cleanup()
+        GPIO.setup(PIN_TRIGGER, GPIO.OUT)
 
-    # Hardware rate setter
-    th_hardware_trigger = Thread(target=th_rpi_trigger_for_cam, daemon=False, name='hardware_trigger')
-    th_hardware_trigger.start()
-    th_hardware_trigger.join()
+        # Hardware rate setter
+        th_hardware_trigger = Thread(target=th_rpi_trigger_for_cam, daemon=False, name='hardware_trigger')
+        th_hardware_trigger.start()
+        th_hardware_trigger.join()
+    except Exception as e:
+        print(str(e))
+    finally:
+        GPIO.cleanup()
