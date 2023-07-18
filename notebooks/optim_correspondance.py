@@ -1,7 +1,7 @@
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
@@ -10,6 +10,18 @@ import pandas as pd
 import torch
 
 from utils.tools import load_files_from_dir
+
+
+def ensure_counts_on_both_files(*, src, dest) -> Tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    src = deepcopy(src)
+    mask_src = np.isin(src['counter'], dest['counter'])
+    for k, v in src.items():
+        src[k] = v[mask_src]
+    dest = deepcopy(dest)
+    mask_dest = np.isin(dest['counter'], src['counter'])
+    for k, v in dest.items():
+        dest[k] = v[mask_dest]
+    return src, dest
 
 
 def save_each_frame_to_separate_file(*, src, dest, path_to_files):
@@ -55,7 +67,7 @@ def fix_timing_between_left_and_right(*,
 
     # Align the two arrays
     diff_start, diff_end = _get_diff(src, dest)
-    if len(src['time_ns_start']) > len(dest['time_ns_start']):
+    if len(src['time_ns_start']) >= len(dest['time_ns_start']):
         diff_start = diff_start.argmin(axis=1)
         diff_end = diff_end.argmin(axis=1)
         mask = diff_start == diff_end

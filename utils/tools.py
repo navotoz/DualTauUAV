@@ -40,15 +40,15 @@ def load_files_from_dir(path):
     for p in list_files:
         try:
             d = np.load(p)
-        except:
+        except Exception:
             continue
         for k, v in d.items():
             data.setdefault(k, []).extend(v)
     if not data:
         try:
             data = np.load(path.with_suffix('.npz'))
-        except:
+        except Exception:
             raise FileNotFoundError(f'No files found in {path}')
-    indices = np.argsort(data['time_ns_start'])
+    indices = np.argsort(data['counter'])
     data = {k: np.stack(v)[indices] for k, v in data.items()}
     return data
