@@ -14,9 +14,3 @@ services:
         bind:
           create_host_path: true
     restart: always
-  rate_limiter:
-    build: rate_limiter/.
-    restart: always
-    privileged: true
-    devices:
-      - '/dev:/dev'

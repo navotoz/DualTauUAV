@@ -446,6 +446,9 @@ class Tau2:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
             return parsed_msg
 
+    def purge(self) -> None:
+        self._ftdi.purge_buffers()
+
     def grab(self, to_temperature: bool = False) -> Tuple[np.ndarray, int, int]:
         # Sync to the next frame by the TEAX magic word
         time_of_frame = time_ns()
@@ -453,20 +456,19 @@ class Tau2:
         time_of_end = time_ns()
         if not res.startswith(TEAX_IN_BYTES):
             return None, time_of_frame, time_of_end
-        res = res[TEAX_LEN:]
 
         # Data must have at least 8 bytes to find the magic word and frame width
-        if len(res) != self._frame_size:
+        if len(res) != TEAX_LEN + self._frame_size:
             return None, time_of_frame, time_of_end
 
         # Check the magic word and frame width
-        magic_word = struct.unpack('h', res[6:8])[0]
-        frame_width = struct.unpack('h', res[1:3])[0] - 2
+        magic_word = struct.unpack('h', res[TEAX_LEN+6:TEAX_LEN+8])[0]
+        frame_width = struct.unpack('h', res[TEAX_LEN+1:TEAX_LEN+3])[0] - 2
         if magic_word != 0x4000 or frame_width != self.width:
             return None, time_of_frame, time_of_end
 
         # Check the size of the frames
-        raw_image_8bit = np.frombuffer(res[6:], dtype='uint8')
+        raw_image_8bit = np.frombuffer(res[TEAX_LEN+6:], dtype='uint8')
         if len(raw_image_8bit) != (2 * (self.width + 2)) * self.height:
             return None, time_of_frame, time_of_end
 

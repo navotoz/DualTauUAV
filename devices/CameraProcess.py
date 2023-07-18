@@ -135,10 +135,13 @@ class CameraCtrl(mp.Process):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
-        self._barrier_camera_sync.wait(timeout=None)  # sync the initialization of both cameras
+        self._barrier_camera_sync.wait(timeout=None)  # sync the initialization of both cameras and the trigger thread
         self._time_start = time_ns()
         while True:
             with self._lock_camera:
+                # Purge the camera buffer before next frame is grabbed with the hardware trigger
+                self._camera.purge()
+
                 # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
                 # Allows even one camera to keep working.
                 # This low value (5Hz) prevents timeout on saving files.
