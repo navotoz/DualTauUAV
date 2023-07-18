@@ -108,11 +108,11 @@ class ThreadDevices(th.Thread):
             GPIO.output(PIN_TRIGGER, GPIO.LOW)
             # Wait for the low_time of duty cycle
             sleep(low_time)
+            self._counter.value = self._counter.value + 1
             # Set the trigger pin to high -> no trigger
             GPIO.output(PIN_TRIGGER, GPIO.HIGH)
             # Wait for high_time of duty cycle
             sleep(high_time)
-            self._counter.value = self._counter.value + 1
 
     @property
     def rate_pan(self):
