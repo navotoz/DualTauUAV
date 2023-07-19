@@ -98,17 +98,21 @@ class ThreadDevices(th.Thread):
 
         # Define a function to toggle the trigger signal at the given rate
         while True:
-            # Wait for all cameras to reach the barrier so its released, at most period * 10 times per second
+            # Wait for all cameras to reach the barrier so its released.
+            # If the timeout value is reached, the barrier is released indefinitely.
             try:
-                self._barrier_camera_sync.wait(timeout=period * 10)
+                self._barrier_camera_sync.wait(timeout=period * 100)
             except RuntimeError:
-                pass
+                print('\n\nTimeout reached, releasing barrier indefinitely\n\n', flush=True)
+                GPIO.output(PIN_TRIGGER, GPIO.LOW)
+                return
 
+            # Count before triggering, so the cameras are always synced to the correct counter value
+            self._counter.value = self._counter.value + 1
             # Set the trigger pin to low -> trigger
             GPIO.output(PIN_TRIGGER, GPIO.LOW)
             # Wait for the low_time of duty cycle
             sleep(low_time)
-            self._counter.value = self._counter.value + 1
             # Set the trigger pin to high -> no trigger
             GPIO.output(PIN_TRIGGER, GPIO.HIGH)
             # Wait for high_time of duty cycle
