@@ -144,12 +144,7 @@ class CameraCtrl(mp.Process):
                 self._camera.purge()
 
                 # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
-                # Allows even one camera to keep working.
-                # This low value (2Hz) prevents timeout on saving files.
-                try:
-                    self._barrier_camera_sync.wait(timeout=0.5)
-                except RuntimeError:
-                    pass
+                self._barrier_camera_sync.wait(timeout=None)
                 frame, time_of_start, time_of_end = self._camera.grab()
             if frame is not None:
                 with self._lock_measurements:
