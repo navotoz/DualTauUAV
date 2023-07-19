@@ -13,14 +13,19 @@ from utils.tools import load_files_from_dir
 
 
 def ensure_counts_on_both_files(*, src, dest) -> Tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    print('Ensuring that both files have the same number of frames by using the frame counter')
     src = deepcopy(src)
     mask_src = np.isin(src['counter'], dest['counter'])
+    print(f'Removing {len(src["counter"]) - mask_src.sum()} of {len(mask_src)} frames from src')
     for k, v in src.items():
         src[k] = v[mask_src]
     dest = deepcopy(dest)
     mask_dest = np.isin(dest['counter'], src['counter'])
+    print(f'Removing {len(dest["counter"]) - mask_dest.sum()} of {len(mask_dest)} frames from dest')
     for k, v in dest.items():
         dest[k] = v[mask_dest]
+    print(f"Number of src frames: {len(src['time_ns_start']):,}")
+    print(f"Number of dest frames: {len(dest['time_ns_start']):,}")
     return src, dest
 
 
@@ -43,18 +48,16 @@ def load_src_and_dest(path_to_files):
     dest = load_files_from_dir(path_to_files / 'mono')
 
     print(f"List of keys in dict: {list(dest.keys())}\n")
-    print(f"Number of left frames: {len(src['time_ns_start']):,}")
-    print(f"Number of right frames: {len(dest['time_ns_start']):,}")
+    print(f"Number of src frames: {len(src['time_ns_start']):,}")
+    print(f"Number of dest frames: {len(dest['time_ns_start']):,}")
     return src, dest
 
 
 def _get_diff(src, dest):
-    times_src = np.stack([src['time_ns_start'], src['time_ns_end']]).copy().astype(float)
-    times_dest = np.stack([dest['time_ns_start'], dest['time_ns_end']]).copy().astype(float)
-    diff = np.abs((times_dest.T[..., None] - times_src[None, ...]))
-    diff_start = diff[:, 0]
-    diff_end = diff[:, 1]
-    return diff_start, diff_end
+    if len(src['time_ns']) > len(dest['time_ns']):
+        return 'src', np.abs(src['time_ns'][:, None] - dest['time_ns'][None, :])
+    else:
+        return 'dest', np.abs(src['time_ns'][None, :] - dest['time_ns'][:, None])
 
 
 def fix_timing_between_left_and_right(*,
@@ -65,33 +68,28 @@ def fix_timing_between_left_and_right(*,
     dest = deepcopy(dest)
     max_time_diff_ns = max_time_diff * 1e9
 
-    # Align the two arrays
-    diff_start, diff_end = _get_diff(src, dest)
-    if len(src['time_ns_start']) >= len(dest['time_ns_start']):
-        diff_start = diff_start.argmin(axis=1)
-        diff_end = diff_end.argmin(axis=1)
-        mask = diff_start == diff_end
-        diff = diff_start[mask]
-        src = {k: v[diff] for k, v in src.items()}
-        dest = {k: v[mask] for k, v in dest.items()}
-    else:
-        raise NotImplementedError
-        diff = diff.argmin(axis=0)
-        dest = {k: v[diff] for k, v in dest.items()}
-
-    # Filter out frames that are too far apart
-    diff_start, diff_end = _get_diff(src, dest)
-    mask = (diff_start.diagonal() <= max_time_diff_ns) & (diff_end.diagonal() <= max_time_diff_ns)
-    src = {k: v[mask] for k, v in src.items()}
-    dest = {k: v[mask] for k, v in dest.items()}
-
     # Replace the start and end times with the mean of the two
-    src['time_ns'] = (src['time_ns_start'] + src['time_ns_end']) / 2
-    dest['time_ns'] = (dest['time_ns_start'] + dest['time_ns_end']) / 2
+    src['time_ns'] = src['time_ns_start']
+    dest['time_ns'] = dest['time_ns_start']
     src.pop('time_ns_start')
     src.pop('time_ns_end')
     dest.pop('time_ns_start')
     dest.pop('time_ns_end')
+
+    # No need to align by time, because the frames are already aligned by counter
+    # # # Align the two arrays
+    # # which_is_longer, diff = _get_diff(src, dest)
+    # # diff = diff.argmin(axis=0)
+    # # if which_is_longer == 'src':
+    # #     src = {k: v[diff] for k, v in src.items()}
+    # # elif which_is_longer == 'dest':
+    # #     dest = {k: v[diff] for k, v in dest.items()}
+
+    # Filter out frames that are too far apart
+    diff = _get_diff(src, dest)[1].diagonal()
+    mask = diff <= max_time_diff_ns
+    src = {k: v[mask] for k, v in src.items()}
+    dest = {k: v[mask] for k, v in dest.items()}
 
     # Time to seconds
     time_minimal = min(src['time_ns'][0], dest['time_ns'][0])
