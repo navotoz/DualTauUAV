@@ -50,3 +50,5 @@ if __name__ == '__main__':
 
 # TODO: add visual feed
 # TODO: add reset procedure
+# TODO: instead of GUID names, use ordered alphanumeric names
+# TODO: add GPS

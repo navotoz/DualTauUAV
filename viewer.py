@@ -65,7 +65,7 @@ def load_all_files_from_path(path: Path) -> Dict[str, np.ndarray]:
         for d in data:
             for k, v in d.items():
                 data_combined.setdefault(k, []).extend(v)
-        indices = np.argsort(data_combined['time_ns'])
+        indices = np.argsort(data_combined['counter'])
         for k, v in data_combined.items():
             data_combined[k] = np.stack(v)[indices]
         return data_combined

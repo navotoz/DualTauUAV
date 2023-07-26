@@ -32,13 +32,13 @@ def closer():
 
 def th_viewer():
     try:
-        frame_pan = camera_pan.grab()
+        frame_pan = camera_pan.grab()[0]
     except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        pass
+        frame_pan = None
     try:
-        frame_mono = camera_mono.grab()
+        frame_mono = camera_mono.grab()[0]
     except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        pass
+        frame_mono = None
     if frame_mono is not None:
         image_tk = ImageTk.PhotoImage(normalize_image(frame_mono).resize((WIDTH_VIEWER, HEIGHT_VIEWER)))
         l_mono_label.image_tk = image_tk
