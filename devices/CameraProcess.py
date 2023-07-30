@@ -165,6 +165,15 @@ class CameraCtrl(mp.Process):
             self._semaphore_get_rate.release()
 
     @property
+    def frame(self) -> np.ndarray:
+        with self._lock_measurements:
+            frame = self._frames.get('frame', [])
+            if len(frame) > 0:
+                return frame[-1]
+            else:
+                return np.zeros((256, 256))
+
+    @property
     def rate_camera(self) -> int:
         self._semaphore_set_rate.release()
         self._semaphore_get_rate.acquire()

@@ -142,3 +142,7 @@ class ThreadDevices(th.Thread):
     @property
     def status_pan(self) -> str:
         return self._make_status(self._camera_pan._param_setting_pos.value)
+
+    @property
+    def frame(self):
+        return self._camera_pan.frame
