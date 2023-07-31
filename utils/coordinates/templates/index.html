@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flask Program</title>
+</head>
+<body>
+    <h1>Flask Program</h1>
+    <form action="/" method="POST">
+        <p>Height takeoff: <input type="text" name="height-takeoff" value="{{ height_takeoff }}"></p>
+        <p>North: <input type="text" name="north" value="{{ north }}"></p>
+        <p>East: <input type="text" name="east" value="{{ east }}"></p>
+        <p>Height: <input type="text" name="height" value="{{ height }}"></p>
+        <p><input type="submit" value="Submit"></p>
+    </form>
+    <p>Heights: {{ height_list }}</p>
+    <p>Longitude: {{ longitude }}</p>
+    <p>Latitude: {{ latitude }}</p>
+</body>
+</html>

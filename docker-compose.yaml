@@ -14,3 +14,8 @@ services:
     privileged: true
     devices:
       - '/dev:/dev'
+  coordinates:
+    build: utils/coordinates/.
+    ports:
+      - "5000:5000"
+    restart: always
