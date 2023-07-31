@@ -5,6 +5,6 @@ flask
 gunicorn
 pyyaml
 pyftdi  # Tau2
-opencv-python
+pillow
 
 RPi.GPIO  # hardware trigger

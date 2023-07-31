@@ -128,3 +128,11 @@ Connection:
 
 - In terminal:
   `export DISPLAY=:0.0`
+
+
+# Enter Docker instead of running gunicron
+Chnage the last line to ```CMD ["/bin/bash"]```
+
+# Transform coordiantes from Israeli to WGS84
+1. python utils/coordinates/csv2csv.py -i test.csv # test.csv --->test_out.csv , heights.csv
+2. python utils/coordinates/csv2djipilot.py test_out.csv -o output.kml  # test_out.csv ---> output.kml

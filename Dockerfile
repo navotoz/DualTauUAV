@@ -29,6 +29,7 @@ RUN /venv/bin/pip3 install -r requirements.txt  --no-cache-dir --index-url https
 
 # Copy files into the build image
 FROM build-venv as build
+RUN ln -s /usr/lib/arm-linux-gnueabihf/libtiff.so /usr/lib/arm-linux-gnueabihf/libtiff.so.5
 COPY . /app
 WORKDIR /app
 
