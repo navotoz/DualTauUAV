@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 from utils.utils_coord import coord_to_dji_kml, process_dgps_pts
 
@@ -18,4 +19,4 @@ if __name__ == "__main__":
     print('\nHeights:')
     [print(i, h) for i, h in enumerate(heights, start=int(coordinates[1][0]))]
     print('\nDJI coordinates:')
-    coord_to_dji_kml(coordinates=coordinates)
+    coord_to_dji_kml(coordinates=coordinates, path_output_file=Path(args.input_file).parent / 'pilot.kml')
