@@ -353,7 +353,7 @@ class Tau2:
                 return
 
     def set_params_by_dict(self, yaml_or_dict: Union[Path, dict]):
-        SLEEP_BETWEEN_PARAMS = 0.4
+        SLEEP_BETWEEN_PARAMS = 0.0
         if isinstance(yaml_or_dict, Path):
             params = yaml.safe_load(yaml_or_dict)
         else:
@@ -433,6 +433,7 @@ class Tau2:
         try:
             data = make_packet(command, argument)
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
+            sleep(0.2)
             time_start = time_ns()
             while time_ns() - time_start <= timeout * 1e9:
                 self._write(data)
@@ -444,6 +445,7 @@ class Tau2:
             self._logger.error(f"Failed to send command: {str(e)}")
         finally:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
+            sleep(0.2)
             return parsed_msg
 
     def purge(self) -> None:

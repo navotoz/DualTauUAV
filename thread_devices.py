@@ -6,21 +6,8 @@ import multiprocessing as mp
 
 from devices import INIT_CAMERA_PARAMETERS, EnumParameterPosition
 from devices.CameraProcess import CameraCtrl
+from utils.tools import DummyGPIO
 NAME_DEVICES_THREAD = 'th_devices'
-
-
-class DummyGPIO:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return None
-
-    def __getattr__(self, name):
-        return self
-
-    def __setattr__(self, name, value):
-        pass
 
 
 try:

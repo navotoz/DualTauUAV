@@ -10,8 +10,6 @@ RUN apt-get install -y --no-install-recommends \
     libc-dev \
     libffi-dev \
     libnotify4 \
-    libgtk2.0-dev \
-    libgtkmm-3.0-1v5 \
     libatlas-base-dev \
     git \
     ffmpeg \

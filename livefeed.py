@@ -1,18 +1,19 @@
-import os
-if os.environ.get('DISPLAY','') == '':
-    os.environ.__setitem__('DISPLAY', ':0.0')
+import io
+from time import sleep
+from flask import Flask, Response, render_template
+import numpy as np
+from PIL import Image
 
-import pyftdi.ftdi
-from PIL import ImageTk
-
-import tkinter as tk
 from devices.Tau2Grabber import Tau2
 
 from utils.misc import normalize_image
+from utils.tools import DummyGPIO
 
 SCALE = 2.5
 WIDTH_VIEWER = int(SCALE*336)
 HEIGHT_VIEWER = int(SCALE*256)
+
+app = Flask(__name__)
 
 
 def closer():
@@ -24,50 +25,69 @@ def closer():
         camera_pan.__del__()
     except (RuntimeError, ValueError, NameError, KeyError, TypeError, AttributeError):
         pass
-    try:
-        root.destroy()
-    except tk.TclError:
-        pass
 
 
-def th_viewer():
-    try:
-        frame_pan = camera_pan.grab()[0]
-    except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        frame_pan = None
-    try:
-        frame_mono = camera_mono.grab()[0]
-    except (RuntimeError, ValueError, NameError, pyftdi.ftdi.FtdiError):
-        frame_mono = None
-    if frame_mono is not None:
-        image_tk = ImageTk.PhotoImage(normalize_image(frame_mono).resize((WIDTH_VIEWER, HEIGHT_VIEWER)))
-        l_mono_label.image_tk = image_tk
-        l_mono_label.configure(image=image_tk)
-    if frame_pan is not None:
-        image_tk = ImageTk.PhotoImage(normalize_image(frame_pan).resize((WIDTH_VIEWER, HEIGHT_VIEWER)))
-        l_pan_label.image_tk = image_tk
-        l_pan_label.configure(image=image_tk)
-    root.after(ms=1000//30, func=th_viewer)
+def generate_frames():
+    while True:
+        # Get frames from cameras
+        pan = camera_pan.grab()[0]
+        mono = camera_mono.grab()[0]
 
+        if pan is None:
+            pan = np.random.rand(256, 256)
+        if mono is None:
+            mono = np.random.rand(256, 256)
+
+        # Normalize
+        pan = normalize_image(pan)
+        mono = normalize_image(mono)
+
+        # Combine frames side by side
+        combined_frame = np.hstack((pan, mono))
+
+        # Convert ndarray to PIL Image
+        pil_image = Image.fromarray(combined_frame)
+
+        # Convert PIL Image to byte stream
+        img_io = io.BytesIO()
+        pil_image.save(img_io, format='JPEG')
+        img_io.seek(0)
+
+        # Yield byte stream as response
+        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + img_io.read() + b'\r\n')
+
+        sleep(1/20)
+
+
+try:
+    import RPi.GPIO as GPIO
+    print('Loaded GPIO module for RPi', flush=True)
+except ModuleNotFoundError:
+    print('Could not load GPIO module for RPi', flush=True)
+    GPIO = DummyGPIO()
+
+# Configure the trigger pin on the RPi
+PIN_TRIGGER = 17
+GPIO.setmode(GPIO.BCM)
+GPIO.cleanup()
+GPIO.setup(PIN_TRIGGER, GPIO.OUT)
+GPIO.output(PIN_TRIGGER, GPIO.LOW)  # Set the trigger pin to low -> constant trigger
 
 camera_pan = Tau2()
 camera_pan.ffc_mode = 'auto'
 camera_mono = Tau2()
 camera_mono.ffc_mode = 'auto'
 
-PAD_X = 10
-PAD_Y = 10
-root = tk.Tk()
-root.protocol('WM_DELETE_WINDOW', closer)
-root.title("Tau2 Livefeed")
-root.geometry(f"{2 * WIDTH_VIEWER + 4 * PAD_X}x{HEIGHT_VIEWER + 2*PAD_Y}")
 
-# Create the labels to display the frames
-l_mono_label = tk.Label(root, width=WIDTH_VIEWER, height=HEIGHT_VIEWER)
-l_mono_label.grid(row=0, column=0, padx=PAD_X, pady=PAD_Y)
-l_pan_label = tk.Label(root, width=WIDTH_VIEWER, height=HEIGHT_VIEWER)
-l_pan_label.grid(row=0, column=1, padx=PAD_X, pady=PAD_Y)
+@app.route('/')
+def index():
+    return render_template('livefeed.html')
 
-th_viewer()
 
-root.mainloop()
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=8080)
