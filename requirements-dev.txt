@@ -9,3 +9,4 @@ einops
 tqdm
 opencv-python
 scipy
+pyproj  # for projecting coordinates for the DJI drone
