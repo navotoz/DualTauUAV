@@ -11,3 +11,5 @@
 **/rawData/
 *.npz
 *.xml
+*.csv
+*.kml

@@ -8,3 +8,5 @@
 **/rawData
 *:Zone.Identifier
 *.xml
+*.csv
+*.kml
