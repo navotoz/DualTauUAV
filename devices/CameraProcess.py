@@ -29,8 +29,6 @@ class CameraCtrl(mp.Process):
         self._barrier_camera_sync: mp.Barrier = barrier_camera_sync
 
         self._path_to_save = path_to_save
-        if not self._path_to_save.is_dir():
-            self._path_to_save.mkdir(parents=True, exist_ok=True)
         self._lock_camera = th.Lock()
         self._camera_params = camera_parameters
         self._event_connected = th.Event()
@@ -192,7 +190,10 @@ class CameraCtrl(mp.Process):
         while True:  # non-daemon thread, so must use flag_run for loop
             self._semaphore_save.acquire()
             now = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            path = (self._path_to_save / f'{now}').with_suffix('.npz')
+            path = Path(self._path_to_save.value) / self._name
+            if not path.is_dir():
+                path.mkdir(parents=True, exist_ok=True)
+            path = (path / f'{now}').with_suffix('.npz')
             with self._lock_measurements:
                 if not isinstance(self._frames, dict) or not self._frames.get('time_ns_start', []):
                     continue

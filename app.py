@@ -52,10 +52,10 @@ def video_feed():
 
 @app.route('/delete_all')
 def delete():
-    for idx, folder in enumerate(path_to_save.parent.glob("*/")):
+    path = Path(path_to_save.value)
+    for idx, folder in enumerate(filter(lambda x: x.is_dir(), path.parent.glob("*"))):
         try:
-            if folder.is_dir() and folder.parent == path_to_save.parent:
-                shutil.rmtree(folder)
+            shutil.rmtree(folder)
         except Exception as e:
             print(e)
     return f'Deleted {idx} folders.'
@@ -69,13 +69,14 @@ def save():
     folder_name = request.form["folder"]
 
     # Change the folder in the path_to_save variable
-    path_to_save = path_to_save.parent / folder_name
-    if path_to_save.is_dir():
+    path = Path(path_to_save.value).parent / folder_name
+    if path.is_dir():
         counter = 0
-        while path_to_save.is_dir():
+        while path.is_dir():
             counter += 1
-            path_to_save = path_to_save.parent / f'{folder_name}_{counter}'
-    path_to_save.mkdir(parents=True, exist_ok=True)
+            path = path.parent / f'{folder_name}_{counter}'
+    path.mkdir(parents=True, exist_ok=True)
+    path_to_save.value = str(path)
 
     print('Changed folder to save to:', folder_name)
     return redirect(request.referrer)
@@ -85,7 +86,7 @@ def save():
 def index():
     return render_template(
         'camera_stats.html',
-        path_to_files=str(path_to_save.name),
+        path_to_files=str(Path(path_to_save.value).name),
         pan_status=thread_devices.status_pan,
         pan_rate=thread_devices.rate_pan,
         pan_files=thread_devices.n_files_pan,
