@@ -19,7 +19,7 @@ except (ModuleNotFoundError, RuntimeError):
 
 
 class ThreadDevices(th.Thread):
-    def __init__(self, path_to_save) -> None:
+    def __init__(self, path_to_save: mp.Value) -> None:
         super().__init__()
         self.name = NAME_DEVICES_THREAD
         self.daemon = False
@@ -44,10 +44,10 @@ class ThreadDevices(th.Thread):
         # Init cameras
         # Cams are synced by the barrier, which releases all cams simultaneously when N_CAMERAS acquire it.
         func_cam = partial(CameraCtrl, camera_parameters=params, is_dummy=False,
-                           barrier_camera_sync=self._barrier_camera_sync,
+                           barrier_camera_sync=self._barrier_camera_sync, path_to_save=path_to_save,
                            counter_frames=self._counter, time_to_save=2e9)  # dump to disk every 2 seconds
-        self._camera_pan = func_cam(path_to_save=path_to_save / 'pan', name='pan')
-        self._camera_mono = func_cam(path_to_save=path_to_save / 'mono', name='mono')
+        self._camera_pan = func_cam(name='pan')
+        self._camera_mono = func_cam(name='mono')
 
     def run(self) -> None:
         self._mp_hardware_trigger.start()

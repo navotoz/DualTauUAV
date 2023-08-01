@@ -1,8 +1,11 @@
 from itertools import product
 from pathlib import Path
 import shutil
-from flask import Flask, Response, render_template
+from flask import Flask, Response, redirect, render_template, request
 import threading as th
+
+import multiprocessing as mp
+from ctypes import c_wchar_p
 
 from thread_devices import ThreadDevices, NAME_DEVICES_THREAD
 from time import sleep
@@ -15,13 +18,14 @@ app = Flask(__name__)
 # Create a random save folder, to avoid error in RPi timestamp
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 gen = product(alphabet, repeat=3)
-path_to_save = Path().cwd() / 'measurements' / str(''.join(next(gen)))
+path_to_save: mp.Value = mp.Value(c_wchar_p)
+path_to_save.value = str(Path().cwd() / 'measurements' / str(''.join(next(gen))))
 while True:
-    if not path_to_save.is_dir():
-        path_to_save.mkdir(parents=True)
+    if not Path(path_to_save.value).is_dir():
+        Path(path_to_save.value).mkdir(parents=True)
         break
     else:
-        path_to_save = Path().cwd() / 'measurements' / str(''.join(next(gen)))
+        path_to_save.value = str(Path().cwd() / 'measurements' / str(''.join(next(gen))))
 
 if NAME_DEVICES_THREAD not in map(lambda x: x.name, th.enumerate()):
     thread_devices = ThreadDevices(path_to_save=path_to_save)
@@ -55,6 +59,26 @@ def delete():
         except Exception as e:
             print(e)
     return f'Deleted {idx} folders.'
+
+
+@app.route("/save", methods=["POST"])
+def save():
+    global path_to_save
+
+    # Get the user input for the folder name
+    folder_name = request.form["folder"]
+
+    # Change the folder in the path_to_save variable
+    path_to_save = path_to_save.parent / folder_name
+    if path_to_save.is_dir():
+        counter = 0
+        while path_to_save.is_dir():
+            counter += 1
+            path_to_save = path_to_save.parent / f'{folder_name}_{counter}'
+    path_to_save.mkdir(parents=True, exist_ok=True)
+
+    print('Changed folder to save to:', folder_name)
+    return redirect(request.referrer)
 
 
 @app.route('/')

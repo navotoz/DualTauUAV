@@ -1,46 +1,54 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Camera Statistics</title>
     <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
 
-        th, td {
-            text-align: left;
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-        }
+      th,
+      td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #ddd;
+      }
 
-        th {
-            background-color: #f2f2f2;
-        }
+      th {
+        background-color: #f2f2f2;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Camera Statistics</h1>
-    <h2> Folder:  {{path_to_files}}   </h2>
+    <h2>Folder: {{path_to_files}}</h2>
     <table>
-        <tr>
-            <th>Camera</th>
-            <th>Status</th>
-            <th>Rate (Hz)</th>
-            <th>Number of Files</th>
-        </tr>
-        <tr>
-            <td>Panchromatic</td>
-            <td>{{ pan_status }}</td>
-            <td>{{ pan_rate }}</td>
-            <td>{{ pan_files }}</td>
-        </tr>
-        <tr>
-            <td>Monochromatic</td>
-            <td>{{ mono_status }}</td>
-            <td>{{ mono_rate }}</td>
-            <td>{{ mono_files }}</td>
-        </tr>
+      <tr>
+        <th>Camera</th>
+        <th>Status</th>
+        <th>Rate (Hz)</th>
+        <th>Number of Files</th>
+      </tr>
+      <tr>
+        <td>Panchromatic</td>
+        <td>{{ pan_status }}</td>
+        <td>{{ pan_rate }}</td>
+        <td>{{ pan_files }}</td>
+      </tr>
+      <tr>
+        <td>Monochromatic</td>
+        <td>{{ mono_status }}</td>
+        <td>{{ mono_rate }}</td>
+        <td>{{ mono_files }}</td>
+      </tr>
     </table>
-</body>
+    <!-- Added a form element with an input and a button -->
+    <hr />
+    <form action="/save" method="post">
+      <label for="folder">Enter the name of the folder to save:</label>
+      <input type="text" id="folder" name="folder" required />
+      <button type="submit">Submit</button>
+    </form>
+  </body>
 </html>

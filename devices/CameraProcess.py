@@ -21,15 +21,14 @@ class CameraCtrl(mp.Process):
     _workers_dict = {}
     _camera: Tau2 = None
 
-    def __init__(self, path_to_save: Union[str, Path],
-                 barrier_camera_sync: mp.Barrier, counter_frames: mp.Value,
-                 name: str = '', time_to_save: int = 10e9,
-                 camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
+    def __init__(self, path_to_save: mp.Value, barrier_camera_sync: mp.Barrier, counter_frames: mp.Value,
+                 name: str = '', time_to_save: int = 10e9, camera_parameters: dict = INIT_CAMERA_PARAMETERS,
+                 is_dummy: bool = False):
         super().__init__()
         self.daemon = False
         self._barrier_camera_sync: mp.Barrier = barrier_camera_sync
 
-        self._path_to_save = Path(path_to_save)
+        self._path_to_save = path_to_save
         if not self._path_to_save.is_dir():
             self._path_to_save.mkdir(parents=True, exist_ok=True)
         self._lock_camera = th.Lock()
