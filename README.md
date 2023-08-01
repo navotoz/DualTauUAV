@@ -101,8 +101,8 @@ https://pimylifeup.com/raspberry-pi-low-voltage-warning/
 
 ### Noitce - use testing program (test_hardware_trigger.py)
 
-![](devices/rpi_gpio_real.png)
-![](devices/rpi_gpio_scheme.png)
+![](misc/rpi_gpio_real.png)
+![](misc/rpi_gpio_scheme.png)
 Connection:
 
 - Blue with orange strip (7 in the JST) -> GND, AKA Pin 9
@@ -121,8 +121,8 @@ Connection:
 
 ### ThermalCapture GrabberUSB
 
-![](devices/ImageTeaxGrabber2.png)
-![](devices/PinoutTeaxGrabber2.png)
+![](misc/ImageTeaxGrabber2.png)
+![](misc/PinoutTeaxGrabber2.png)
 
 # Run tkinter in ssh
 
