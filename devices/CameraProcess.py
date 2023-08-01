@@ -4,7 +4,6 @@ from pathlib import Path
 import threading as th
 from ctypes import c_ushort, c_uint
 from time import sleep, time_ns
-from typing import Union
 
 import numpy as np
 
