@@ -13,7 +13,7 @@ NAME_DEVICES_THREAD = 'th_devices'
 try:
     import RPi.GPIO as GPIO
     print('Loaded GPIO module for RPi', flush=True)
-except ModuleNotFoundError:
+except (ModuleNotFoundError, RuntimeError):
     print('Could not load GPIO module for RPi', flush=True)
     GPIO = DummyGPIO()
 
