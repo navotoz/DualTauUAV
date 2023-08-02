@@ -14,8 +14,8 @@ services:
     privileged: true
     devices:
       - '/dev:/dev'
-  coordinates:
-    build: utils/coordinates/.
-    ports:
-      - "5000:5000"
-    restart: always
+  # coordinates:  # doesn't work on the RPi for some reason
+  #   build: utils/coordinates/.
+  #   ports:
+  #     - "5000:5000"
+  #   restart: always
