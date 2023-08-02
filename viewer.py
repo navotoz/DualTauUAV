@@ -171,10 +171,14 @@ if __name__ == "__main__":
         data_pan = load(path_to_all_files)
     else:
         path_pan = path_to_all_files / 'pan'
+        if path_pan.with_suffix('.npz').exists():
+            path_pan = path_pan.with_suffix('.npz')
         if not path_pan.exists():
             raise FileNotFoundError(f'{path_pan} does not exist.')
         data_pan = load_all_files_from_path(path_pan)
         path_mono = path_to_all_files / 'mono'
+        if path_mono.with_suffix('.npz').exists():
+            path_mono = path_mono.with_suffix('.npz')
         if not path_mono.exists():
             raise FileNotFoundError(f'{path_mono} does not exist.')
         data_mono = load_all_files_from_path(path_mono)
