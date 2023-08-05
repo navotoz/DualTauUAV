@@ -107,17 +107,3 @@ def array_to_image(arr, text):
     with BytesIO() as output:
         img.save(output, format='JPEG')
         return output.getvalue()
-
-
-class DummyGPIO:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return None
-
-    def __getattr__(self, name):
-        return self
-
-    def __setattr__(self, name, value):
-        pass

@@ -20,12 +20,10 @@ class CameraCtrl(mp.Process):
     _workers_dict = {}
     _camera: Tau2 = None
 
-    def __init__(self, path_to_save: mp.Value, barrier_camera_sync: mp.Barrier, counter_frames: mp.Value,
-                 name: str = '', time_to_save: int = 10e9, camera_parameters: dict = INIT_CAMERA_PARAMETERS,
-                 is_dummy: bool = False):
+    def __init__(self, path_to_save: mp.Value, name: str = '', time_to_save: int = 10e9,
+                 camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
-        self._barrier_camera_sync: mp.Barrier = barrier_camera_sync
 
         self._path_to_save = path_to_save
         self._lock_camera = th.Lock()
@@ -36,7 +34,6 @@ class CameraCtrl(mp.Process):
         self._frames = {}
         self._fpa, self._housing = 0, 0
         self._time_to_save = time_to_save
-        self._counter = counter_frames
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -132,15 +129,9 @@ class CameraCtrl(mp.Process):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
-        self._barrier_camera_sync.wait(timeout=None)  # sync the initialization of both cameras and the trigger thread
         self._time_start = time_ns()
         while True:
             with self._lock_camera:
-                # Purge the camera buffer before next frame is grabbed with the hardware trigger
-                self._camera.purge()
-
-                # Barrier before the TEAX sync and after it, so the same frame is grabbed by all cameras
-                self._barrier_camera_sync.wait(timeout=None)
                 frame, time_of_start, time_of_end = self._camera.grab()
             if frame is not None:
                 with self._lock_measurements:
@@ -148,7 +139,6 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('time_ns_end', []).append(time_of_end)
                     self._frames.setdefault('frame', []).append(frame)
                     self._frames.setdefault('fpa', []).append(self._fpa)
-                    self._frames.setdefault('counter', []).append(self._counter.value)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
 
@@ -203,7 +193,6 @@ class CameraCtrl(mp.Process):
                      frames=np.stack(data['frame']),
                      fpa=np.stack(data['fpa']),
                      #  housing=np.stack(data['housing']),
-                     counter=np.stack(data['counter']),
                      time_ns_end=np.stack(data['time_ns_end']),
                      time_ns_start=np.stack(data['time_ns_start']))
             self._logger.info(f'Dumped image {str(path)}')

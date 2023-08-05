@@ -87,12 +87,9 @@ def index():
     return render_template(
         'camera_stats.html',
         path_to_files=str(Path(path_to_save.value).name),
-        pan_status=thread_devices.status_pan,
-        pan_rate=thread_devices.rate_pan,
-        pan_files=thread_devices.n_files_pan,
-        mono_status=thread_devices.status_mono,
-        mono_rate=thread_devices.rate_mono,
-        mono_files=thread_devices.n_files_mono)
+        cam_status=thread_devices.status,
+        cam_rate=thread_devices.rate,
+        n_files=thread_devices.n_files)
 
 
 if __name__ == '__main__':
