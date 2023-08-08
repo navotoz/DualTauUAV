@@ -21,8 +21,7 @@ HEIGHT_VIEWER = int(SCALE * 256)
 relations_height_to_width = HEIGHT_VIEWER / WIDTH_VIEWER
 low_frame = -1
 high_frame = -1
-data_to_save_mono = {}
-data_to_save_pan = {}
+data_to_save = {}
 
 
 def normalize_image(image: np.ndarray) -> Image.Image:
@@ -80,7 +79,12 @@ def load_all_files_from_path(path: Path) -> Dict[str, np.ndarray]:
         for d in data:
             for k, v in d.items():
                 data_combined.setdefault(k, []).extend(v)
-        indices = np.argsort(data_combined['counter'])
+        if 'counter' in data_combined:
+            indices = np.argsort(data_combined['counter'])
+        elif 'time_ns_start' in data_combined:
+            indices = np.argsort(data_combined['time_ns_start'])
+        elif 'time_ns' in data_combined:
+            indices = np.argsort(data_combined['time_ns'])
         for k, v in data_combined.items():
             data_combined[k] = np.stack(v)[indices]
         return data_combined
@@ -129,7 +133,7 @@ def mark_high_frame(event):
 
 
 def append_to_data(event):
-    global low_frame, high_frame, data_to_save_pan, data_to_save_mono
+    global low_frame, high_frame, data_to_save
     if low_frame == -1:
         low_frame = 0
     if high_frame == -1:
@@ -138,11 +142,7 @@ def append_to_data(event):
     pan = {k: v[low_frame:high_frame] for k, v in data_pan.items()}
     pan['height'] = np.array([height_of_frames] * len(pan['frames']), dtype='uint16')
     for k, v in pan.items():
-        data_to_save_pan.setdefault(k, []).append(v)
-    mono = {k: v[low_frame:high_frame] for k, v in data_mono.items()}
-    mono['height'] = np.array([height_of_frames] * len(mono['frames']), dtype='uint16')
-    for k, v in mono.items():
-        data_to_save_mono.setdefault(k, []).append(v)
+        data_to_save.setdefault(k, []).append(v)
     print(f'Appended {low_frame}:{high_frame} with {height_of_frames} to data.')
 
 
@@ -152,12 +152,9 @@ def save_single_file(event):
         low_frame = 0
     if high_frame == -1:
         high_frame = len(images)
-    for k, v in data_to_save_pan.items():
-        data_to_save_pan[k] = np.concatenate(v)
-    for k, v in data_to_save_mono.items():
-        data_to_save_mono[k] = np.concatenate(v)
-    np.savez(Path(args.files) / 'mono', **data_to_save_mono)
-    np.savez(Path(args.files) / 'pan', **data_to_save_pan)
+    for k, v in data_to_save.items():
+        data_to_save[k] = np.concatenate(v)
+    np.savez(Path(args.files) / 'pan', **data_to_save)
 
 
 if __name__ == "__main__":
@@ -176,15 +173,6 @@ if __name__ == "__main__":
         if not path_pan.exists():
             raise FileNotFoundError(f'{path_pan} does not exist.')
         data_pan = load_all_files_from_path(path_pan)
-        path_mono = path_to_all_files / 'mono'
-        if path_mono.with_suffix('.npz').exists():
-            path_mono = path_mono.with_suffix('.npz')
-        if not path_mono.exists():
-            raise FileNotFoundError(f'{path_mono} does not exist.')
-        data_mono = load_all_files_from_path(path_mono)
-
-        # Compare counter values
-        data_mono, data_pan = ensure_counts_on_both_files(src=data_mono, dest=data_pan)
 
     # Normalize pan data for display
     images = [normalize_image(p) for p in tqdm(data_pan['frames'], desc='Normalize images')]
