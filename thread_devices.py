@@ -124,6 +124,14 @@ class ThreadDevices(th.Thread):
         return self._camera_pan.n_files_saved
 
     @property
+    def temperature_pan(self):
+        return self._camera_pan.temperature
+
+    @property
+    def temperature_mono(self):
+        return self._camera_mono.temperature
+
+    @property
     def n_files_mono(self):
         return self._camera_mono.n_files_saved
 
