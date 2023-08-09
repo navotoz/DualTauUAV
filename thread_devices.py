@@ -66,6 +66,10 @@ class ThreadDevices(th.Thread):
     def n_files(self):
         return self._camera.n_files_saved
 
+    @property
+    def temperature(self):
+        return self._camera.temperature
+
     def _make_status(self, stat: int):
         stat = EnumParameterPosition(stat)
         if stat == EnumParameterPosition.DONE:
@@ -79,7 +83,7 @@ class ThreadDevices(th.Thread):
 
     @property
     def frame(self):
-        return self._camera_pan.frame
+        return self._camera.frame
 
     def _rpi_temp_func(self):
         cpu = CPUTemperature()
