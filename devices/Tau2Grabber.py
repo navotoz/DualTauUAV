@@ -433,7 +433,7 @@ class Tau2:
         try:
             data = make_packet(command, argument)
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.RESET)
-            sleep(0.2)
+            sleep(0.1)
             time_start = time_ns()
             while time_ns() - time_start <= timeout * 1e9:
                 self._write(data)
@@ -445,7 +445,7 @@ class Tau2:
             self._logger.error(f"Failed to send command: {str(e)}")
         finally:
             self._ftdi.set_bitmode(0xFF, Ftdi.BitMode.SYNCFF)
-            sleep(0.2)
+            sleep(0.1)
             return parsed_msg
 
     def purge(self) -> None:

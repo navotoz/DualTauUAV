@@ -21,9 +21,9 @@ class CameraCtrl(mp.Process):
     _camera: Tau2 = None
 
     def __init__(self, path_to_save: mp.Value, name: str = '', time_to_save: int = 10e9,
-                 camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
+                 limit_rate_camera: int = 0, camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
-        self._defined_rate_of_camera_hz = 30
+        self._defined_rate_of_camera_hz = limit_rate_camera if limit_rate_camera > 0 else 100
         self.daemon = False
 
         self._path_to_save = path_to_save
@@ -133,8 +133,9 @@ class CameraCtrl(mp.Process):
         self._time_start, time_frame = time_ns(), time_ns()
         time_single_frame = 1e9 / self._defined_rate_of_camera_hz
         while True:
-            while time_ns() - time_frame < time_single_frame:
+            if time_ns() - time_frame < time_single_frame:
                 continue
+            time_frame = time_ns()
             with self._lock_camera:
                 frame, time_of_start, time_of_end = self._camera.grab()
             if frame is not None:
@@ -145,7 +146,6 @@ class CameraCtrl(mp.Process):
                     self._frames.setdefault('fpa', []).append(self._fpa)
                     # self._frames.setdefault('housing', []).append(self._housing)
                     self._n_frames += 1
-            time_frame = time_ns()
 
     def _th_rate_camera_function(self) -> None:
         while True:  # no wait for _event_connected to avoid being blocked by the _th_connect
