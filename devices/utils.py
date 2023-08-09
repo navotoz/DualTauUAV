@@ -166,3 +166,17 @@ def make_packet(command: Code, argument: Optional[bytes] = None) -> bytes:
 
     data = struct.pack(fmt, *packet)
     return data
+
+
+class DummyGPIO:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return None
+
+    def __getattr__(self, name):
+        return self
+
+    def __setattr__(self, name, value):
+        pass
