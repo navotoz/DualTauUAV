@@ -21,9 +21,8 @@ class CameraCtrl(mp.Process):
     _camera: Tau2 = None
 
     def __init__(self, path_to_save: mp.Value, delta_t_for_ffc: float = 100., name: str = '', time_to_save: int = 10e9,
-                 limit_rate_camera: int = 0, camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
+                 camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
-        self._defined_rate_of_camera_hz = limit_rate_camera if limit_rate_camera > 0 else 100
         self.daemon = False
 
         self._path_to_save = path_to_save
@@ -109,7 +108,7 @@ class CameraCtrl(mp.Process):
 
     def _th_ffc(self, delta_t: float) -> None:
         self._event_connected.wait()
-        fpa_previous = 0.0
+        fpa_previous = self._fpa
         while True:
             with self._lock_measurements:
                 fpa_current = self._fpa
@@ -134,7 +133,7 @@ class CameraCtrl(mp.Process):
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
-                self._logger.info(f'{t_type} temperature update successful, to {t}C.')
+                self._logger.info(f'{t_type} temperature update successful, to {t / 100}C.')
             except (BrokenPipeError, RuntimeError):
                 self._logger.info(f'{t_type} temperature update failed.')
                 pass
@@ -151,12 +150,8 @@ class CameraCtrl(mp.Process):
     def _th_getter_frame(self) -> None:
         frame = None
         self._event_connected.wait()
-        self._time_start, time_frame = time_ns(), time_ns()
-        time_single_frame = 1e9 / self._defined_rate_of_camera_hz
+        self._time_start = time_ns()
         while True:
-            if time_ns() - time_frame < time_single_frame:
-                continue
-            time_frame = time_ns()
             with self._lock_camera:
                 frame, time_of_start, time_of_end = self._camera.grab()
             if frame is not None:

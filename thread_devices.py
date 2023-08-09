@@ -22,7 +22,6 @@ class ThreadDevices(th.Thread):
         func_cam = partial(CameraCtrl,
                            camera_parameters=params,
                            is_dummy=False,
-                           limit_rate_camera=30,
                            path_to_save=path_to_save,
                            time_to_save=2e9)  # dump to disk every 2 seconds
         self._camera = func_cam(name='pan')
