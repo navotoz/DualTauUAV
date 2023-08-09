@@ -138,7 +138,7 @@ class CameraCtrl(mp.Process):
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
-                self._temperature_camera.value = self._fpa
+                self._temperature_camera.value = self._fpa / 100
                 self._logger.info(f'{t_type} temperature update successful, to {t / 100}C.')
             except (BrokenPipeError, RuntimeError):
                 self._logger.info(f'{t_type} temperature update failed.')
