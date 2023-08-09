@@ -2,7 +2,7 @@ from datetime import datetime
 import multiprocessing as mp
 from pathlib import Path
 import threading as th
-from ctypes import c_ushort, c_uint
+from ctypes import c_float, c_ushort, c_uint
 from time import sleep, time_ns
 
 import numpy as np
@@ -40,6 +40,7 @@ class CameraCtrl(mp.Process):
         self._delta_t_for_ffc = delta_t_for_ffc
         if delta_t_for_ffc < 10:
             raise ValueError('The delta_t_for_ffc must be in [100C], got {delta_t_for_ffc}C')
+        self._temperature_camera: mp.Value = mp.Value(c_float)
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -125,6 +126,10 @@ class CameraCtrl(mp.Process):
                     self._logger.warning('FFC failed.')
             sleep(TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS)
 
+    @property
+    def temperature(self) -> float:
+        return self._temperature_camera.value
+
     def _getter_temperature(self, t_type: str):  # this function exists for the th_connect function, otherwise redundant
         with self._lock_camera:
             t = self._camera.get_inner_temperature(t_type) if isinstance(self._camera, Tau2) else None
@@ -136,6 +141,7 @@ class CameraCtrl(mp.Process):
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
+                self._temperature_camera.value = self._fpa
                 self._logger.info(f'{t_type} temperature update successful, to {t}C.')
             except (BrokenPipeError, RuntimeError):
                 self._logger.info(f'{t_type} temperature update failed.')

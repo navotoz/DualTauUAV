@@ -30,18 +30,21 @@
       <tr>
         <th>Camera</th>
         <th>Status</th>
-        <th>Rate (Hz)</th>
+        <th>Temperature [C]</th>
+        <th>Rate [Hz]</th>
         <th>Number of Files</th>
       </tr>
       <tr>
         <td>Panchromatic</td>
         <td>{{ pan_status }}</td>
+        <td>{{ pan_temperature }}</td>
         <td>{{ pan_rate }}</td>
         <td>{{ pan_files }}</td>
       </tr>
       <tr>
         <td>Monochromatic</td>
         <td>{{ mono_status }}</td>
+        <td>{{ mono_temperature }}</td>
         <td>{{ mono_rate }}</td>
         <td>{{ mono_files }}</td>
       </tr>

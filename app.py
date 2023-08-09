@@ -89,9 +89,10 @@ def index():
         path_to_files=str(Path(path_to_save.value).name),
         temperature_rpi=round(thread_devices.temperature_rpi, 2),
         pan_status=thread_devices.status_pan,
+        pan_temperature=thread_devices.temperature_pan,
         pan_rate=thread_devices.rate_pan,
         pan_files=thread_devices.n_files_pan,
-        mono_status=thread_devices.status_mono,
+        mono_temperature=thread_devices.temperature_mono,
         mono_rate=thread_devices.rate_mono,
         mono_files=thread_devices.n_files_mono)
 
