@@ -21,8 +21,8 @@ class CameraCtrl(mp.Process):
     _camera: Tau2 = None
 
     def __init__(self, path_to_save: mp.Value, barrier_camera_sync: mp.Barrier, counter_frames: mp.Value,
-                 name: str = '', time_to_save: int = 10e9, camera_parameters: dict = INIT_CAMERA_PARAMETERS,
-                 is_dummy: bool = False):
+                 delta_t_for_ffc: float = 100., name: str = '', time_to_save: int = 10e9,
+                 camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
         self._barrier_camera_sync: mp.Barrier = barrier_camera_sync
@@ -37,6 +37,9 @@ class CameraCtrl(mp.Process):
         self._fpa, self._housing = 0, 0
         self._time_to_save = time_to_save
         self._counter = counter_frames
+        self._delta_t_for_ffc = delta_t_for_ffc
+        if delta_t_for_ffc < 10:
+            raise ValueError('The delta_t_for_ffc must be in [100C], got {delta_t_for_ffc}C')
 
         # process-safe param setting position
         self._param_setting_pos: mp.Value = mp.Value(typecode_or_type=c_ushort)  # uint16
@@ -71,6 +74,8 @@ class CameraCtrl(mp.Process):
             target=self._th_dump_data, name=f'th_dump_data_{self._name}', daemon=False)
         self._workers_dict['timer'] = th.Thread(target=self._th_timer, name=f'th_timer_{self._name}', daemon=True)
         self._workers_dict['conn'] = th.Thread(target=self._th_connect, name=f'th_cam_conn_{self._name}', daemon=False)
+        self._workers_dict['ffc'] = th.Thread(target=self._th_ffc, kwargs={'delta_t': self._delta_t_for_ffc},
+                                              name=f'th_cam_ffc_{self._name}', daemon=False)
         [p.start() for p in self._workers_dict.values()]
 
     @property
@@ -104,6 +109,22 @@ class CameraCtrl(mp.Process):
                 pass
             sleep(1)
 
+    def _th_ffc(self, delta_t: float) -> None:
+        self._event_connected.wait()
+        fpa_previous = 0.0
+        while True:
+            with self._lock_measurements:
+                fpa_current = self._fpa
+            if abs(fpa_current - fpa_previous) >= delta_t:
+                with self._lock_camera:
+                    ret_val = self._camera.ffc()
+                if ret_val:
+                    self._logger.info(f'FFC. Current {fpa_current / 100:.2f}C. Previous {fpa_previous / 100:.2f}C.')
+                    fpa_previous = fpa_current
+                else:
+                    self._logger.warning('FFC failed.')
+            sleep(TEMPERATURE_ACQUIRE_FREQUENCY_SECONDS)
+
     def _getter_temperature(self, t_type: str):  # this function exists for the th_connect function, otherwise redundant
         with self._lock_camera:
             t = self._camera.get_inner_temperature(t_type) if isinstance(self._camera, Tau2) else None
@@ -115,7 +136,7 @@ class CameraCtrl(mp.Process):
                         self._fpa = round(t, -1)  # precision for the fpa is 0.1C
                     elif t_type == T_HOUSING:
                         self._housing = t  # precision of the housing is 0.01C
-                self._logger.info(f'{t_type} temperature update successful.')
+                self._logger.info(f'{t_type} temperature update successful, to {t}C.')
             except (BrokenPipeError, RuntimeError):
                 self._logger.info(f'{t_type} temperature update failed.')
                 pass
