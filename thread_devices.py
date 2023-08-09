@@ -15,8 +15,8 @@ class ThreadDevices(th.Thread):
 
         # Init two cameras - Panchromatic and Monochromatic
         params = INIT_CAMERA_PARAMETERS
-        params['ffc_mode'] = 'auto'
-        params['ffc_period'] = 3600  # ffc every one minute
+        params['ffc_mode'] = 'manual'  # manually control the ffc from the CameraProcess
+        params['ffc_period'] = 0
 
         # Init cameras
         func_cam = partial(CameraCtrl,
