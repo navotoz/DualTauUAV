@@ -108,7 +108,7 @@ class CameraCtrl(mp.Process):
 
     def _th_ffc(self, delta_t: float) -> None:
         self._event_connected.wait()
-        fpa_previous = self._fpa
+        fpa_previous = 0.0
         while True:
             with self._lock_measurements:
                 fpa_current = self._fpa
