@@ -53,7 +53,7 @@ class ThreadDevices(th.Thread):
                            counter_frames=self._counter, time_to_save=2e9)  # dump to disk every 2 seconds
         self._camera_pan = func_cam(name='pan')
         self._camera_mono = func_cam(name='mono')
-        self._path_to_files = path_to_save
+        self._path_to_rpi_temperature = Path(path_to_save.value).parent
 
         # Collect RPi temperature
         self._mp_rpi_temp = mp.Process(target=self._rpi_temp, daemon=True, name='rpi_temp')
@@ -150,20 +150,20 @@ class ThreadDevices(th.Thread):
         cpu = CPUTemperature()
         while True:
             try:
-                t = cpu.temperature
+                try:
+                    t = cpu.temperature
+                except Exception:
+                    continue
+                try:
+                    t = float(t)
+                    t = round(t, 2)
+                except Exception:
+                    continue
+                self._t_rpi.value = t
+                with open(self._path_to_rpi_temperature / 'rpi_temp.txt', 'a') as f:
+                    f.write(f'{datetime.utcnow().strftime("%Y%m%d %H%M%S")}\t{t:.2f}C\n')
             except Exception:
-                continue
-            try:
-                t = float(t)
-                t = round(t, 2)
-            except Exception:
-                continue
-            path_to_save = Path(self._path_to_files.value)
-            if not path_to_save.is_dir():
-                path_to_save.mkdir(parent=True)
-            with open(path_to_save / 'rpi_temp.txt', 'a') as f:
-                f.write(f'{datetime.utcnow().strftime("%Y%m%d %H%M%S")}\t{t:.2f}C\n')
-            self._t_rpi.value = t
+                pass
             sleep(30)
 
     @property
