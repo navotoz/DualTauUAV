@@ -87,6 +87,7 @@ def index():
     return render_template(
         'camera_stats.html',
         path_to_files=str(Path(path_to_save.value).name),
+        temperature_rpi=round(thread_devices.temperature_rpi, 2),
         pan_status=thread_devices.status_pan,
         pan_rate=thread_devices.rate_pan,
         pan_files=thread_devices.n_files_pan,

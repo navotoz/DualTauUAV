@@ -8,3 +8,4 @@ pyftdi  # Tau2
 pillow
 
 RPi.GPIO  # hardware trigger
+gpiozero  # RPi temperature collection

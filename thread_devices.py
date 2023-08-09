@@ -1,5 +1,7 @@
-from ctypes import c_uint
+from ctypes import c_uint, c_float
+from datetime import datetime
 from functools import partial
+from pathlib import Path
 import threading as th
 from time import sleep
 import multiprocessing as mp
@@ -13,9 +15,12 @@ NAME_DEVICES_THREAD = 'th_devices'
 try:
     import RPi.GPIO as GPIO
     print('Loaded GPIO module for RPi', flush=True)
+    from gpiozero import CPUTemperature
+    print('Loaded gpiozero module for RPi', flush=True)
 except (ModuleNotFoundError, RuntimeError):
     print('Could not load GPIO module for RPi', flush=True)
     GPIO = DummyGPIO()
+    CPUTemperature = DummyGPIO
 
 
 class ThreadDevices(th.Thread):
@@ -48,9 +53,16 @@ class ThreadDevices(th.Thread):
                            counter_frames=self._counter, time_to_save=2e9)  # dump to disk every 2 seconds
         self._camera_pan = func_cam(name='pan')
         self._camera_mono = func_cam(name='mono')
+        self._path_to_files = path_to_save
+
+        # Collect RPi temperature
+        self._mp_rpi_temp = mp.Process(target=self._rpi_temp, daemon=True, name='rpi_temp')
+        self._t_rpi = mp.Value(c_float)
+        self._t_rpi.value = 0.0
 
     def run(self) -> None:
         self._mp_hardware_trigger.start()
+        self._mp_rpi_temp.start()
         self._camera_mono.start()
         while self._camera_mono.camera_parameters_setting_position != EnumParameterPosition.DONE.value:
             sleep(1)
@@ -133,3 +145,27 @@ class ThreadDevices(th.Thread):
     @property
     def frame(self):
         return self._camera_pan.frame
+
+    def _rpi_temp_func(self):
+        cpu = CPUTemperature()
+        while True:
+            try:
+                t = cpu.temperature
+            except Exception:
+                continue
+            try:
+                t = float(t)
+                t = round(t, 2)
+            except Exception:
+                continue
+            path_to_save = Path(self._path_to_files.value)
+            if not path_to_save.is_dir():
+                path_to_save.mkdir(parent=True)
+            with open(path_to_save / 'rpi_temp.txt', 'a') as f:
+                f.write(f'{datetime.utcnow().strftime("%Y%m%d %H%M%S")}\t{t:.2f}C\n')
+            self._t_rpi.value = t
+            sleep(30)
+
+    @property
+    def temperature_rpi(self):
+        return self._t_rpi.value
