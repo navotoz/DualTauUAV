@@ -20,7 +20,7 @@ class CameraCtrl(mp.Process):
     _workers_dict = {}
     _camera: Tau2 = None
 
-    def __init__(self, path_to_save: mp.Value, delta_t_for_ffc: float = 100., name: str = '', time_to_save: int = 10e9,
+    def __init__(self, path_to_save: mp.Value, delta_t_for_ffc: float = 30., name: str = '', time_to_save: int = 10e9,
                  camera_parameters: dict = INIT_CAMERA_PARAMETERS, is_dummy: bool = False):
         super().__init__()
         self.daemon = False
