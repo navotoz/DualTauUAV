@@ -44,7 +44,7 @@ class ThreadDevices(th.Thread):
         self._path_to_files = path_to_save
 
         # Collect RPi temperature
-        self._mp_rpi_temp = mp.Process(target=self._rpi_temp, daemon=True, name='rpi_temp')
+        self._mp_rpi_temp = mp.Process(target=self._rpi_temp_func, daemon=True, name='rpi_temp')
         self._t_rpi = mp.Value(c_float)
         self._t_rpi.value = 0.0
 
