@@ -13,7 +13,6 @@ from PIL import ImageTk
 from PIL import Image
 from tqdm import tqdm
 
-from notebooks.optim_correspondance import ensure_counts_on_both_files
 
 SCALE = 3
 WIDTH_VIEWER = int(SCALE * 336)
@@ -116,26 +115,31 @@ def closer():
 
 def left_key(event):
     slider.set(max(slider.get() - 1, 0))
+    root.focus_set()
 
 
 def right_key(event):
     slider.set(min(slider.get() + 1, len(images)))
+    root.focus_set()
 
 
 def mark_low_frame(event):
     global low_frame
+    root.focus_set()
     low_frame = slider.get()
     print(f'Lowest frame number: {low_frame}')
 
 
 def mark_high_frame(event):
     global high_frame
+    root.focus_set()
     high_frame = slider.get()
     print(f'Highest frame number: {high_frame}')
 
 
 def append_to_data(event):
     global low_frame, high_frame, data_to_save
+    root.focus_set()
     if low_frame == -1:
         low_frame = 0
     if high_frame == -1:
@@ -149,7 +153,8 @@ def append_to_data(event):
 
 
 def save_single_file(event):
-    global low_frame, high_frame, path_to_all_files
+    global low_frame, high_frame, path_to_all_files, data_to_save
+    root.focus_set()
     if low_frame == -1:
         low_frame = 0
     if high_frame == -1:
@@ -166,6 +171,7 @@ def save_single_file(event):
         path_to_save = (path_to_folder / f'{input_path.get()}_{idx}').with_suffix('.npz')
         idx += 1
     np.savez(path_to_save, **data_to_save)
+    data_to_save = {}
 
 
 if __name__ == "__main__":
