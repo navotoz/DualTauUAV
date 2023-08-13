@@ -40,7 +40,7 @@ def normalize_image(image: np.ndarray) -> Image.Image:
 
 def validate_input(input):
     # Check if the input matches a regular expression for numbers
-    if re.match("^[0-9]+$", input):
+    if re.match("^[0-9]+$", input) or input == '':
         return True
     else:
         return False
@@ -92,12 +92,14 @@ def load_all_files_from_path(path: Path) -> Dict[str, np.ndarray]:
 
 def display(event):
     image = images[slider.get() - 1]
-    height_label = input_entry.winfo_height()
-    height_entry = input_entry.winfo_height()
+    height_label = label_input_height.winfo_height()
+    height_entry = input_height.winfo_height()
+    path_label = label_input_path.winfo_height()
+    path_entry = input_path.winfo_height()
     size_root = (root.winfo_height(), root.winfo_width())
     size_canvas = (canvas.winfo_height(), canvas.winfo_width())
     if size_canvas != size_root:
-        canvas_height = root.winfo_height() - height_label - height_entry
+        canvas_height = root.winfo_height() - height_label - height_entry - path_label - path_entry
         canvas_width = int(canvas_height / relations_height_to_width)
         canvas.config(width=canvas_width, height=canvas_height)
     image_tk = ImageTk.PhotoImage(image.resize(reversed(size_canvas)))
@@ -138,7 +140,7 @@ def append_to_data(event):
         low_frame = 0
     if high_frame == -1:
         high_frame = len(images)
-    height_of_frames = int(input_entry.get())
+    height_of_frames = int(input_height.get())
     pan = {k: v[low_frame:high_frame] for k, v in data_pan.items()}
     pan['height'] = np.array([height_of_frames] * len(pan['frames']), dtype='uint16')
     for k, v in pan.items():
@@ -147,14 +149,23 @@ def append_to_data(event):
 
 
 def save_single_file(event):
-    global low_frame, high_frame
+    global low_frame, high_frame, path_to_all_files
     if low_frame == -1:
         low_frame = 0
     if high_frame == -1:
         high_frame = len(images)
     for k, v in data_to_save.items():
         data_to_save[k] = np.concatenate(v)
-    np.savez(Path(args.files) / 'pan', **data_to_save)
+    if path_to_all_files.is_file():
+        path_to_all_files = path_to_all_files.parent
+    path_to_folder = path_to_all_files / 'results'
+    path_to_folder.mkdir(exist_ok=True, parents=True)
+    path_to_save = (path_to_folder / input_path.get()).with_suffix('.npz')
+    idx = 1
+    while path_to_save.exists():
+        path_to_save = (path_to_folder / f'{input_path.get()}_{idx}').with_suffix('.npz')
+        idx += 1
+    np.savez(path_to_save, **data_to_save)
 
 
 if __name__ == "__main__":
@@ -185,14 +196,22 @@ if __name__ == "__main__":
     root.geometry(f"{WIDTH_VIEWER}x{HEIGHT_VIEWER}")
     root.pack_propagate(0)
 
-    # Add user input
-    _entry_label = tk.Label(root)
-    _entry_label.pack(side=tk.TOP, fill=tk.X)
-    input_label = tk.Label(_entry_label, text="Enter height of frames:")
-    input_label.pack(side=tk.LEFT, padx=10, pady=10)
+    # Add user input - path to save data
+    _label_path = tk.Label(root)
+    _label_path.pack(side=tk.TOP, fill=tk.X)
+    label_input_path = tk.Label(_label_path, text="Enter name of file to save data:")
+    label_input_path.pack(side=tk.LEFT, padx=10, pady=10)
+    input_path = tk.Entry(_label_path)
+    input_path.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    # Add user input - height
+    _label_height = tk.Label(root)
+    _label_height.pack(side=tk.TOP, fill=tk.X)
+    label_input_height = tk.Label(_label_height, text="Enter height of frames:")
+    label_input_height.pack(side=tk.LEFT, padx=10, pady=10)
     validate_command = root.register(validate_input)
-    input_entry = tk.Entry(_entry_label, validate='key', validatecommand=(validate_command, "%P"))
-    input_entry.pack(side=tk.RIGHT, padx=10, pady=10)
+    input_height = tk.Entry(_label_height, validate='key', validatecommand=(validate_command, "%P"))
+    input_height.pack(side=tk.RIGHT, padx=10, pady=10)
 
     # Save data to file
     slider = tk.Scale(root, from_=0, to=len(images), orient=tk.HORIZONTAL, resolution=1, command=display)
@@ -203,10 +222,10 @@ if __name__ == "__main__":
 
     # Pressing the 'a' key marks the lowest frame number
     # Pressing the 'd' key marks the highest frame number
-    root.bind('<a>', mark_low_frame)
-    root.bind('<d>', mark_high_frame)
-    root.bind('<s>', save_single_file)
-    root.bind('<w>', append_to_data)
+    root.bind('<Control-a>', mark_low_frame)
+    root.bind('<Control-d>', mark_high_frame)
+    root.bind('<Control-s>', save_single_file)
+    root.bind('<Control-w>', append_to_data)
 
     app.pack()
     canvas = tk.Label(app)
@@ -214,10 +233,11 @@ if __name__ == "__main__":
 
     print('\nInstructions:')
     print('Press the left and right arrow keys to navigate through the images.')
-    print('Press the \'a\' key to mark the lowest frame number.')
-    print('Press the \'d\' key to mark the highest frame number.')
+    print('Press the Ctrl + a key to mark the lowest frame number.')
+    print('Press the Ctrl + d key to mark the highest frame number.')
     print('Input the height of the frames in the entry box.')
-    print('Press the \'w\' key to append the marked frames to the data.')
-    print('Press the \'s\' key to save the data to a file.')
+    print('Press the Ctrl + w key to append the marked frames to the data.')
+    print('Input the name of the file to save in the entry box.')
+    print('Press the Ctrl + s key to save the data to a file.')
 
     root.mainloop()
